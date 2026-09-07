@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Aaj Kya Bane</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap');
+
+:root{
+  --bg:#FBF3E1; --ink:#2B1D14; --ink-soft:#6B5A48;
+  --card:#F3E9D2; --card-line: rgba(43,29,20,0.14);
+  --gold:#C08415; --gold-soft:#EEDCAE;
+  --green:#3F6C4B; --green-soft:#DCE7DC;
+  --red:#A63D2F; --red-soft:#F0DAD3;
+  --white:#FFFFFF;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:'Inter',system-ui,sans-serif; line-height:1.5;
+  min-height:100vh; padding-bottom:70px;
+}
+.wrap{max-width:640px;margin:0 auto;padding:24px 18px 0;}
+h1.wordmark{font-family:'Fraunces',serif;font-weight:600;font-size:32px;margin:0 0 4px;letter-spacing:-0.01em;}
+p.tagline{margin:0 0 22px;color:var(--ink-soft);font-size:14.5px;}
+
+/* --- gate screen --- */
+#gate{max-width:420px;margin:60px auto;padding:0 20px;text-align:center;}
+#gate h1{font-family:'Fraunces',serif;font-size:30px;margin-bottom:6px;}
+#gate p{color:var(--ink-soft);font-size:14.5px;margin-bottom:26px;}
+.gate-card{background:var(--card);border:1px solid var(--card-line);border-radius:10px;padding:20px;margin-bottom:16px;text-align:left;}
+.gate-card label{display:block;font-size:12.5px;font-weight:600;color:var(--ink-soft);margin-bottom:6px;}
+.gate-card input{width:100%;padding:11px;font-size:16px;border:1px solid var(--card-line);border-radius:8px;text-transform:uppercase;letter-spacing:1px;}
+.gate-error{color:var(--red);font-size:13px;margin-top:8px;}
+.or-sep{color:var(--ink-soft);font-size:13px;margin:14px 0;}
+
+button.btn{font-family:'Inter',sans-serif;font-size:14.5px;font-weight:600;padding:11px 18px;border-radius:8px;border:1px solid var(--ink);background:var(--ink);color:var(--white);cursor:pointer;width:100%;}
+button.btn.secondary{background:var(--white);color:var(--ink);border:1px solid var(--card-line);}
+button.btn.small{padding:7px 12px;font-size:13px;width:auto;}
+
+.room-banner{display:flex;justify-content:space-between;align-items:center;background:var(--card);border:1px solid var(--card-line);border-radius:8px;padding:10px 14px;margin-bottom:18px;font-size:13.5px;}
+.room-banner b{font-family:'Fraunces',serif;letter-spacing:1px;}
+.room-banner button{background:none;border:none;color:var(--ink-soft);text-decoration:underline;font-size:13px;cursor:pointer;}
+
+.tabs{display:flex;gap:20px;border-bottom:1px solid var(--card-line);margin-bottom:20px;overflow-x:auto;}
+.tab{background:none;border:none;cursor:pointer;font-size:14.5px;font-weight:600;color:var(--ink-soft);padding:0 0 12px;position:relative;white-space:nowrap;}
+.tab.active{color:var(--ink);}
+.tab.active::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--gold);}
+.panel{display:none;} .panel.active{display:block;}
+h2.section-title{font-family:'Fraunces',serif;font-weight:500;font-size:18px;margin:0 0 10px;}
+.hint{color:var(--ink-soft);font-size:12.5px;margin:-6px 0 12px;}
+
+.chip-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px;}
+.chip{border:1px solid var(--card-line);background:var(--white);color:var(--ink);padding:7px 13px;border-radius:100px;font-size:13.5px;cursor:pointer;user-select:none;}
+.chip.on{background:var(--ink);border-color:var(--ink);color:var(--white);}
+.chip .x{margin-left:6px;color:var(--ink-soft);}
+.chip.on .x{color:var(--white);opacity:.7;}
+
+input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9px 11px;border:1px solid var(--card-line);border-radius:8px;background:var(--white);color:var(--ink);width:100%;}
+.tag-input-row{display:flex;gap:8px;margin-bottom:8px;}
+
+.pick-card{background:var(--card);border:1px solid var(--card-line);border-left:4px solid var(--gold);border-radius:6px;padding:14px 16px;margin-bottom:12px;}
+.pick-card.great{border-left-color:var(--green);}
+.pick-card.avoid{border-left-color:var(--red);}
+.pick-card.unknown{border-left-color:var(--ink-soft);}
+.pick-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+.pick-name{font-family:'Fraunces',serif;font-weight:600;font-size:17px;}
+.pick-meta{font-size:12px;color:var(--ink-soft);margin-top:3px;}
+.pick-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+.nutrition-row{display:flex;gap:12px;margin-top:10px;flex-wrap:wrap;font-size:11.5px;color:var(--ink-soft);}
+.nutrition-row span b{color:var(--ink);font-size:13px;}
+
+.badge{font-size:11px;padding:2px 9px;border-radius:100px;white-space:nowrap;background:var(--gold-soft);color:#7A5610;}
+.badge.great{background:var(--green-soft);color:var(--green);}
+.badge.avoid{background:var(--red-soft);color:var(--red);}
+.badge.unknown{background:#E7E0D3;color:var(--ink-soft);}
+
+.empty{text-align:center;color:var(--ink-soft);padding:36px 10px;font-size:13.5px;}
+
+.dish-form{background:var(--card);border:1px solid var(--card-line);border-radius:8px;padding:16px;margin-bottom:24px;}
+.dish-form .field{margin-bottom:12px;}
+.dish-form label{display:block;font-size:12px;color:var(--ink-soft);margin-bottom:5px;font-weight:600;}
+.dish-form .grid4{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+
+.dish-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--card-line);}
+.dish-row:last-child{border-bottom:none;}
+.dish-row-name{font-family:'Fraunces',serif;font-weight:600;font-size:15.5px;}
+.dish-row-meta{font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
+.icon-btn{border:none;background:none;color:var(--ink-soft);cursor:pointer;font-size:12.5px;padding:4px 6px;}
+
+.person-add-row{display:flex;gap:8px;margin-bottom:16px;}
+.person-add-row input{flex:1;}
+.section-divider{height:1px;background:var(--card-line);margin:22px 0;}
+.filter-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.week-box{background:var(--card);border:1px solid var(--card-line);border-radius:8px;padding:16px;margin-bottom:20px;}
+.week-box .nutrition-row{margin-top:6px;}
+
+/* --- now bar + meal planner --- */
+.now-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--card);border:1px solid var(--card-line);border-radius:10px;padding:12px 16px;margin-bottom:18px;flex-wrap:wrap;}
+.now-bar .now-when{font-size:12px;color:var(--ink-soft);}
+.now-bar .now-time{font-family:'Fraunces',serif;font-weight:600;font-size:19px;color:var(--ink);margin-top:2px;}
+.now-bar .now-meal{text-align:right;}
+.now-bar .now-meal small{display:block;font-size:10.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.06em;margin-bottom:1px;}
+.now-bar .now-meal b{font-family:'Fraunces',serif;font-size:19px;color:var(--gold);text-transform:capitalize;}
+.meal-tabs{display:flex;gap:8px;margin-bottom:16px;}
+.meal-tabs .chip{flex:1;text-align:center;text-transform:capitalize;}
+
+/* veg / non-veg indicator (classic green/red mark) */
+.diet-dot{display:inline-block;width:13px;height:13px;border-radius:3px;border:1.5px solid var(--green);position:relative;vertical-align:middle;margin-right:6px;flex:none;}
+.diet-dot::after{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:6px;height:6px;border-radius:50%;background:var(--green);}
+.diet-dot.nonveg{border-color:var(--red);}
+.diet-dot.nonveg::after{background:var(--red);}
+.meal-tag{display:inline-block;font-size:10.5px;padding:1px 8px;border-radius:100px;background:var(--gold-soft);color:#7A5610;text-transform:capitalize;margin:2px 4px 0 0;}
+
+/* inline cook-rating editor on each dish row */
+.dish-edit{display:flex;align-items:center;gap:8px;margin-top:8px;}
+.dish-edit-label{font-size:11.5px;color:var(--ink-soft);}
+.rate-select{width:auto;padding:5px 9px;font-size:12.5px;}
+
+/* per-person meal schedule toggles */
+.person-meals{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;}
+.person-meals .mini{font-size:11px;padding:3px 10px;border-radius:100px;border:1px solid var(--card-line);background:var(--white);color:var(--ink-soft);cursor:pointer;text-transform:capitalize;}
+.person-meals .mini.on{background:var(--green-soft);border-color:var(--green);color:var(--green);}
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <h1>Aaj Kya Bane</h1>
+  <p>What your household likes, crossed with what your cook makes well.</p>
+  <div class="gate-card">
+    <label>Have a room code?</label>
+    <input type="text" id="join-code" placeholder="e.g. PB7K2Q" maxlength="6" />
+    <div style="height:10px;"></div>
+    <button class="btn" id="join-btn">Join room</button>
+    <div class="gate-error" id="join-error"></div>
+  </div>
+  <div class="or-sep">or</div>
+  <button class="btn secondary" id="create-btn">Create a new room</button>
+</div>
+
+<div class="wrap" id="app" style="display:none;">
+  <div class="room-banner">
+    <span>Room code: <b id="room-code-display"></b></span>
+    <button id="leave-btn">Switch room</button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="today">Today</button>
+    <button class="tab" data-tab="dishes">Dishes</button>
+    <button class="tab" data-tab="people">People</button>
+    <button class="tab" data-tab="week">This week</button>
+  </div>
+
+  <div class="panel active" id="panel-today">
+    <div class="now-bar" id="now-bar">
+      <div>
+        <div class="now-when" id="now-day"></div>
+        <div class="now-time" id="now-time"></div>
+      </div>
+      <div class="now-meal">
+        <small>Planning for</small>
+        <b id="now-meal"></b>
+        <div class="now-when" id="now-meal-when"></div>
+      </div>
+    </div>
+    <div class="meal-tabs" id="day-tabs" style="margin-bottom:8px;"></div>
+    <div class="meal-tabs" id="meal-tabs"></div>
+
+    <h2 class="section-title" id="today-people-title">Who's eating?</h2>
+    <div class="chip-row" id="today-people"></div>
+
+    <h2 class="section-title">What's fresh today? <span style="font-weight:400;color:var(--ink-soft);font-size:12.5px;">(optional)</span></h2>
+    <div class="tag-input-row"><input type="text" id="ingredient-input" placeholder="Add what's in the kitchen today" /></div>
+    <div class="chip-row" id="today-ingredients"></div>
+
+    <div class="section-divider"></div>
+    <h2 class="section-title" id="plan-title">Requested</h2>
+    <div id="plan-box"></div>
+
+    <h2 class="section-title" style="margin-top:22px;">Suggestions</h2>
+    <p class="hint">Tap “Let’s get it made” to request a dish for the day &amp; meal above — it saves the plan and messages didi.</p>
+    <div class="filter-row" id="picks-diet-filter"></div>
+    <div id="picks-list"></div>
+  </div>
+
+  <div class="panel" id="panel-dishes">
+    <h2 class="section-title">Add a dish</h2>
+    <div id="dish-suggestions"></div>
+    <div class="dish-form">
+      <div class="field"><label>Dish name</label><input type="text" id="dish-name" placeholder="e.g. Paneer Tikka Masala" /></div>
+      <div class="field"><label>Category</label>
+        <select id="dish-category">
+          <option value="breakfast">Breakfast / tiffin</option>
+          <option value="paratha">Paratha / roti</option><option value="paneer">Paneer</option>
+          <option value="curry">Curry / gravy</option><option value="dal">Dal</option>
+          <option value="rice">Rice</option><option value="egg">Egg</option>
+          <option value="snack">Snack</option><option value="other">Other</option>
+        </select>
+      </div>
+      <div class="field"><label>Veg or non-veg</label>
+        <select id="dish-diet">
+          <option value="veg">Veg</option><option value="nonveg">Non-veg</option>
+        </select>
+      </div>
+      <div class="field"><label>Good for which meals</label>
+        <div class="chip-row" id="dish-meal-picker"></div>
+      </div>
+      <div class="field"><label>Who likes this</label><div class="chip-row" id="dish-people-picker"></div></div>
+      <div class="field"><label>How well does your cook make this?</label>
+        <select id="dish-cook-rating">
+          <option value="great">Makes it great</option><option value="okay">Makes it okay</option>
+          <option value="unknown">Doesn't know it yet</option><option value="avoid">Not great — avoid</option>
+        </select>
+      </div>
+      <div class="field"><label>Key ingredients (optional)</label>
+        <div class="tag-input-row"><input type="text" id="dish-ingredient-input" placeholder="Add an ingredient, press enter" /></div>
+        <div class="chip-row" id="dish-ingredients-picker"></div>
+      </div>
+      <div class="field">
+        <label>Approximate nutrition per serving <span style="font-weight:400;">(optional — for your own awareness, not medical advice)</span></label>
+        <div class="grid4">
+          <input type="text" id="dish-kcal" placeholder="kcal" inputmode="numeric" />
+          <input type="text" id="dish-protein" placeholder="protein (g)" inputmode="numeric" />
+          <input type="text" id="dish-carbs" placeholder="carbs (g)" inputmode="numeric" />
+          <input type="text" id="dish-fat" placeholder="fat (g)" inputmode="numeric" />
+        </div>
+      </div>
+      <button class="btn" id="save-dish-btn" style="margin-top:6px;">Add dish</button>
+    </div>
+    <h2 class="section-title">Your dish list</h2>
+    <div class="filter-row" id="dish-category-filter"></div>
+    <div class="filter-row" id="dish-diet-filter"></div>
+    <div id="dish-list"></div>
+  </div>
+
+  <div class="panel" id="panel-people">
+    <h2 class="section-title">Household members</h2>
+    <div class="person-add-row"><input type="text" id="person-name" placeholder="Add a name" /><button class="btn" id="add-person-btn" style="width:auto;">Add</button></div>
+    <div id="people-list"></div>
+    <div class="section-divider"></div>
+    <h2 class="section-title">Cook's language</h2>
+    <p class="hint">Used when generating a recipe search link, so results are more useful to your cook.</p>
+    <div class="tag-input-row">
+      <input type="text" id="cook-language" placeholder="e.g. Kannada, Odia, Hindi" />
+      <button class="btn" id="save-language-btn" style="width:auto;">Save</button>
+    </div>
+  </div>
+
+  <div class="panel" id="panel-week">
+    <h2 class="section-title">This week's intake (rough total)</h2>
+    <p class="hint">Adds up nutrition from everything marked "made today" in the last 7 days. Approximate — for awareness, not tracking.</p>
+    <div class="week-box" id="week-summary"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const MEALS = ['breakfast', 'lunch', 'dinner'];
+  let roomCode = localStorage.getItem('aajkyabane-room') || '';
+  let room = null;
+  let selectedMeal = mealPlan().meal;   // which meal we're planning for
+  let selectedDay = mealPlan().when;    // 'today' | 'tomorrow'
+  let selectedTodayPeople = [];
+  let todayIngredients = [];
+  let picksDietFilter = 'all';          // 'all' | 'veg' | 'nonveg'
+  let dishFormLikedBy = [];
+  let dishFormIngredients = [];
+  let dishFormMealTimes = [];
+  let dishCategoryFilter = 'all';
+  let dishDietFilter = 'all';
+
+  function escapeHtml(str){ return String(str).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+  function daysSince(dateStr){ if(!dateStr) return 999; const d1=new Date(dateStr), d2=new Date(new Date().toISOString().slice(0,10)); return Math.round((d2-d1)/86400000); }
+
+  // --- meal + diet helpers (defensive about older data without these fields) ---
+  function mealPlan(){
+    const now = new Date();
+    const h = now.getHours();
+    let meal, when;
+    if(h < 10){ meal='breakfast'; when='today'; }
+    else if(h < 15){ meal='lunch'; when='today'; }
+    else if(h < 21){ meal='dinner'; when='today'; }
+    else { meal='breakfast'; when='tomorrow'; }
+    return { meal, when, now };
+  }
+  function personMeals(p){ const m=(p&&p.meals)||{}; return {breakfast:m.breakfast!==false, lunch:m.lunch!==false, dinner:m.dinner!==false}; }
+  function dishMealTimes(d){ return Array.isArray(d.mealTimes) ? d.mealTimes : []; }
+  function dishSuitsMeal(d, meal){ const mt=dishMealTimes(d); return mt.length===0 || mt.includes(meal); } // untagged = any meal
+  function dishDiet(d){ return d.diet==='nonveg' ? 'nonveg' : 'veg'; }
+  function dietDot(d){ return `<span class="diet-dot ${dishDiet(d)==='nonveg'?'nonveg':''}"></span>`; }
+  function isoForDay(day){
+    const d = new Date();
+    if(day==='tomorrow') d.setDate(d.getDate()+1);
+    const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), da=String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${da}`; // local date, so "tomorrow" means the user's tomorrow
+  }
+  function isPlanned(dishId){ return (room.plan||[]).some(p=>p.date===isoForDay(selectedDay)&&p.meal===selectedMeal&&p.dishId===dishId); }
+
+  async function api(path, method, body){
+    const res = await fetch('/api'+path, {
+      method: method||'GET',
+      headers: body ? {'Content-Type':'application/json'} : {},
+      body: body ? JSON.stringify(body) : undefined
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'Request failed');
+    return data;
+  }
+
+  async function tryEnterRoom(code){
+    try{
+      room = await api('/room/'+code, 'GET');
+      roomCode = code;
+      localStorage.setItem('aajkyabane-room', code);
+      document.getElementById('gate').style.display='none';
+      document.getElementById('app').style.display='block';
+      document.getElementById('room-code-display').textContent = roomCode;
+      autoSelectPeopleForMeal();
+      renderAll();
+      return true;
+    }catch(e){
+      return false;
+    }
+  }
+
+  document.getElementById('join-btn').addEventListener('click', async ()=>{
+    const code = document.getElementById('join-code').value.trim().toUpperCase();
+    if(!code) return;
+    const ok = await tryEnterRoom(code);
+    if(!ok) document.getElementById('join-error').textContent = "Couldn't find that room — check the code with whoever shared it.";
+  });
+  document.getElementById('create-btn').addEventListener('click', async ()=>{
+    room = await api('/room','POST');
+    roomCode = room.code;
+    localStorage.setItem('aajkyabane-room', roomCode);
+    document.getElementById('gate').style.display='none';
+    document.getElementById('app').style.display='block';
+    document.getElementById('room-code-display').textContent = roomCode;
+    autoSelectPeopleForMeal();
+    renderAll();
+  });
+  document.getElementById('leave-btn').addEventListener('click', ()=>{
+    localStorage.removeItem('aajkyabane-room');
+    location.reload();
+  });
+
+  document.querySelectorAll('.tab').forEach(tab=>{
+    tab.addEventListener('click', ()=>{
+      document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('panel-'+tab.dataset.tab).classList.add('active');
+      if(tab.dataset.tab === 'week') renderWeek();
+    });
+  });
+
+  // ---------- NOW BAR + MEAL PLANNER ----------
+  function renderNowBar(){
+    const { now } = mealPlan();
+    const days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    document.getElementById('now-day').textContent = days[now.getDay()]+', '+now.getDate()+' '+months[now.getMonth()];
+    let hr=now.getHours(); const min=String(now.getMinutes()).padStart(2,'0'); const ap=hr<12?'AM':'PM'; let h12=hr%12; if(h12===0) h12=12;
+    document.getElementById('now-time').textContent = h12+':'+min+' '+ap;
+    document.getElementById('now-meal').textContent = selectedMeal;
+    const p = mealPlan();
+    let whenTxt = selectedDay==='tomorrow' ? 'tomorrow' : 'today';
+    if(selectedDay===p.when && selectedMeal===p.meal) whenTxt = 'the next meal · '+p.when;
+    document.getElementById('now-meal-when').textContent = whenTxt;
+  }
+  function renderDayTabs(){
+    const el = document.getElementById('day-tabs');
+    const days = [['today','Today'],['tomorrow','Tomorrow']];
+    el.innerHTML = days.map(([v,l])=>`<button class="chip ${selectedDay===v?'on':''}" data-day="${v}">${l}</button>`).join('');
+    el.querySelectorAll('[data-day]').forEach(b=>b.addEventListener('click', ()=>{
+      selectedDay = b.dataset.day;
+      renderDayTabs(); renderNowBar(); renderPlan(); renderPicks();
+    }));
+  }
+  function renderMealTabs(){
+    const el = document.getElementById('meal-tabs');
+    el.innerHTML = MEALS.map(m=>`<button class="chip ${selectedMeal===m?'on':''}" data-meal="${m}">${m}</button>`).join('');
+    el.querySelectorAll('[data-meal]').forEach(b=>b.addEventListener('click', ()=>{
+      selectedMeal = b.dataset.meal;
+      autoSelectPeopleForMeal();
+      renderMealTabs(); renderNowBar(); renderTodayPeoplePicker(); renderPlan(); renderPicks();
+    }));
+  }
+  function tellDidi(dish){
+    const whenWord = selectedDay==='tomorrow' ? 'tomorrow' : 'today';
+    let msg = `Didi 🙏 Can you please make ${dish.name} for ${selectedMeal} ${whenWord}?`;
+    if(dish.cookRating==='unknown'){
+      const langSuffix = room.cookLanguage ? ' recipe in '+room.cookLanguage : ' recipe';
+      const url = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(dish.name + langSuffix);
+      msg += ` Here's a recipe: ${url}`;
+    }
+    window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+  }
+  function renderPlan(){
+    const dayWord = selectedDay==='tomorrow' ? 'tomorrow' : 'today';
+    document.getElementById('plan-title').textContent = `Requested for ${dayWord}’s ${selectedMeal}`;
+    const box = document.getElementById('plan-box');
+    const entries = (room.plan||[]).filter(p=>p.date===isoForDay(selectedDay)&&p.meal===selectedMeal);
+    if(entries.length===0){ box.innerHTML = `<div class="empty">Nothing requested yet — tap “Let’s get it made” on a suggestion below.</div>`; return; }
+    box.innerHTML = entries.map(p=>{
+      const dish = room.dishes.find(d=>d.id===p.dishId);
+      return `<div class="dish-row">
+        <div><div class="dish-row-name">${dish?dietDot(dish):''}${escapeHtml(p.dishName)}</div>
+        <div class="dish-row-meta">Requested for ${dayWord} · ${selectedMeal}</div></div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button class="btn small secondary" data-made-plan="${p.id}:${p.dishId}">✓ Made</button>
+          <button class="icon-btn" data-remove-plan="${p.id}">Remove</button>
+        </div>
+      </div>`;
+    }).join('');
+    box.querySelectorAll('[data-made-plan]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const [pid, dishId] = btn.dataset.madePlan.split(':');
+        await api(`/room/${roomCode}/dishes/${dishId}`, 'PUT', {markMadeToday:true});
+        await api(`/room/${roomCode}/plan/${pid}`, 'DELETE');
+        room = await api('/room/'+roomCode, 'GET');
+        renderPlan(); renderPicks();
+      });
+    });
+    box.querySelectorAll('[data-remove-plan]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        await api(`/room/${roomCode}/plan/${btn.dataset.removePlan}`, 'DELETE');
+        room = await api('/room/'+roomCode, 'GET');
+        renderPlan(); renderPicks();
+      });
+    });
+  }
+  function autoSelectPeopleForMeal(){
+    if(!room) return;
+    selectedTodayPeople = room.people.filter(p=>personMeals(p)[selectedMeal]).map(p=>p.id);
+  }
+  function renderPicksDietFilter(){
+    const el = document.getElementById('picks-diet-filter');
+    const opts = [['all','All'],['veg','Veg'],['nonveg','Non-veg']];
+    el.innerHTML = opts.map(([v,l])=>`<button class="chip ${picksDietFilter===v?'on':''}" data-pdf="${v}">${l}</button>`).join('');
+    el.querySelectorAll('[data-pdf]').forEach(b=>b.addEventListener('click', ()=>{ picksDietFilter=b.dataset.pdf; renderPicksDietFilter(); renderPicks(); }));
+  }
+
+  // ---------- PEOPLE ----------
+  function renderPeopleList(){
+    const el = document.getElementById('people-list');
+    if(room.people.length===0){ el.innerHTML = '<div class="empty">No one added yet.</div>'; return; }
+    el.innerHTML = room.people.map(p=>{
+      const pm = personMeals(p);
+      return `<div class="dish-row" style="align-items:flex-start;">
+        <div>
+          <div class="dish-row-name">${escapeHtml(p.name)}</div>
+          <div class="dish-row-meta">Home for these meals — tap to change</div>
+          <div class="person-meals">${MEALS.map(m=>`<button class="mini ${pm[m]?'on':''}" data-person-meal="${p.id}:${m}">${m}</button>`).join('')}</div>
+        </div>
+        <button class="icon-btn" data-remove-person="${p.id}">Remove</button>
+      </div>`;
+    }).join('');
+    el.querySelectorAll('[data-remove-person]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        await api(`/room/${roomCode}/people/${btn.dataset.removePerson}`, 'DELETE');
+        room = await api('/room/'+roomCode, 'GET');
+        selectedTodayPeople = selectedTodayPeople.filter(id=>room.people.some(p=>p.id===id));
+        renderAll();
+      });
+    });
+    el.querySelectorAll('[data-person-meal]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const [pid, meal] = btn.dataset.personMeal.split(':');
+        const person = room.people.find(p=>p.id===pid);
+        const pm = personMeals(person); pm[meal] = !pm[meal];
+        await api(`/room/${roomCode}/people/${pid}`, 'PUT', {meals: pm});
+        room = await api('/room/'+roomCode, 'GET');
+        autoSelectPeopleForMeal();
+        renderPeopleList(); renderTodayPeoplePicker(); renderPicks();
+      });
+    });
+  }
+  document.getElementById('add-person-btn').addEventListener('click', async ()=>{
+    const input = document.getElementById('person-name');
+    const name = input.value.trim();
+    if(!name) return;
+    await api(`/room/${roomCode}/people`, 'POST', {name});
+    input.value='';
+    room = await api('/room/'+roomCode, 'GET');
+    renderAll();
+  });
+  document.getElementById('person-name').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('add-person-btn').click(); });
+  document.getElementById('save-language-btn').addEventListener('click', async ()=>{
+    const lang = document.getElementById('cook-language').value.trim();
+    room = await api(`/room/${roomCode}`, 'PUT', {cookLanguage: lang});
+  });
+
+  // ---------- TODAY ----------
+  function renderTodayPeoplePicker(){
+    document.getElementById('today-people-title').textContent = "Who's eating this "+selectedMeal+'?';
+    const el = document.getElementById('today-people');
+    if(room.people.length===0){ el.innerHTML = '<span class="hint">Add household members in the People tab first.</span>'; return; }
+    el.innerHTML = room.people.map(p=>`<button class="chip ${selectedTodayPeople.includes(p.id)?'on':''}" data-today-person="${p.id}">${escapeHtml(p.name)}</button>`).join('');
+    el.querySelectorAll('[data-today-person]').forEach(chip=>{
+      chip.addEventListener('click', ()=>{
+        const id = chip.dataset.todayPerson;
+        if(selectedTodayPeople.includes(id)) selectedTodayPeople = selectedTodayPeople.filter(x=>x!==id);
+        else selectedTodayPeople.push(id);
+        renderTodayPeoplePicker(); renderPicks();
+      });
+    });
+  }
+  function renderTodayIngredients(){
+    const el = document.getElementById('today-ingredients');
+    el.innerHTML = todayIngredients.map(ing=>`<span class="chip on">${escapeHtml(ing)} <span class="x" data-remove-ing="${escapeHtml(ing)}">×</span></span>`).join('');
+    el.querySelectorAll('[data-remove-ing]').forEach(x=>{
+      x.addEventListener('click', ()=>{ todayIngredients = todayIngredients.filter(i=>i!==x.dataset.removeIng); renderTodayIngredients(); renderPicks(); });
+    });
+  }
+  document.getElementById('ingredient-input').addEventListener('keydown', e=>{
+    if(e.key==='Enter'){
+      const v = e.target.value.trim().toLowerCase();
+      if(v && !todayIngredients.includes(v)){ todayIngredients.push(v); e.target.value=''; renderTodayIngredients(); renderPicks(); }
+    }
+  });
+
+  function scoreDish(d){
+    let likedFrac;
+    if(selectedTodayPeople.length>0){
+      const likedCount = d.likedBy.filter(id=>selectedTodayPeople.includes(id)).length;
+      likedFrac = likedCount/selectedTodayPeople.length;
+    } else { likedFrac = d.likedBy.length>0 ? 1 : 0.5; }
+    const cookWeight = {great:2, okay:1, unknown:0, avoid:-4}[d.cookRating] ?? 0;
+    const gap = daysSince(d.lastMade);
+    let recencyPenalty = gap<=1 ? -3 : gap<=3 ? -1 : 0;
+    let ingredientBonus = 0;
+    if(todayIngredients.length>0 && d.ingredients.length>0){
+      const overlap = d.ingredients.filter(i=>todayIngredients.includes(i)).length;
+      ingredientBonus = overlap>0 ? 1.5 : -0.5;
+    }
+    return likedFrac*3 + cookWeight + recencyPenalty + ingredientBonus;
+  }
+
+  function nutritionLine(n){
+    if(!n) return '';
+    return `<div class="nutrition-row">
+      <span><b>${n.kcal||0}</b> kcal</span>
+      <span><b>${n.protein||0}g</b> protein</span>
+      <span><b>${n.carbs||0}g</b> carbs</span>
+      <span><b>${n.fat||0}g</b> fat</span>
+      ${n.fiber!==undefined?`<span><b>${n.fiber}g</b> fibre</span>`:''}
+    </div>`;
+  }
+
+  function renderPicks(){
+    const list = document.getElementById('picks-list');
+    if(room.dishes.length===0){ list.innerHTML = '<div class="empty">Add a few dishes in the Dishes tab to get suggestions.</div>'; return; }
+    let pool = room.dishes.filter(d=>dishSuitsMeal(d, selectedMeal));
+    if(picksDietFilter!=='all') pool = pool.filter(d=>dishDiet(d)===picksDietFilter);
+    if(pool.length===0){ list.innerHTML = `<div class="empty">No ${picksDietFilter!=='all'?picksDietFilter+' ':''}dishes tagged for ${selectedMeal} yet. Tag some in the Dishes tab.</div>`; return; }
+    const ranked = pool.map(d=>({d, score:scoreDish(d)})).sort((a,b)=>b.score-a.score).slice(0,6);
+    const ratingLabel = {great:'Cook makes it great', okay:'Cook makes it okay', unknown:"Cook doesn't know it", avoid:'Cook struggles with this'};
+    list.innerHTML = ranked.map(({d})=>{
+      const likedNames = d.likedBy.map(id=> room.people.find(p=>p.id===id)?.name).filter(Boolean);
+      const mealTags = dishMealTimes(d).map(m=>`<span class="meal-tag">${m}</span>`).join('');
+      return `<div class="pick-card ${d.cookRating}">
+        <div class="pick-top">
+          <div><div class="pick-name">${dietDot(d)}${escapeHtml(d.name)}</div>
+          <div class="pick-meta">${likedNames.length? 'Liked by '+likedNames.map(escapeHtml).join(', ') : 'No one tagged yet'}${d.lastMade? ' · last made '+daysSince(d.lastMade)+'d ago' : ''}</div>
+          ${mealTags?`<div style="margin-top:6px;">${mealTags}</div>`:''}</div>
+          <span class="badge ${d.cookRating}">${ratingLabel[d.cookRating]}</span>
+        </div>
+        ${nutritionLine(d.nutrition)}
+        <div class="pick-actions">
+          <button class="btn small ${isPlanned(d.id)?'secondary':''}" data-request="${d.id}">${isPlanned(d.id)?'✓ In plan · remind didi':'Let’s get it made'}</button>
+        </div>
+      </div>`;
+    }).join('');
+    list.querySelectorAll('[data-request]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const dish = room.dishes.find(x=>x.id===btn.dataset.request);
+        await api(`/room/${roomCode}/plan`, 'POST', {date: isoForDay(selectedDay), meal: selectedMeal, dishId: dish.id});
+        room = await api('/room/'+roomCode, 'GET');
+        tellDidi(dish);
+        renderPlan(); renderPicks();
+      });
+    });
+  }
+
+  // ---------- DISHES ----------
+  function renderDishPeoplePicker(){
+    const el = document.getElementById('dish-people-picker');
+    if(room.people.length===0){ el.innerHTML = '<span class="hint">Add household members in the People tab first.</span>'; return; }
+    el.innerHTML = room.people.map(p=>`<button type="button" class="chip ${dishFormLikedBy.includes(p.id)?'on':''}" data-dish-person="${p.id}">${escapeHtml(p.name)}</button>`).join('');
+    el.querySelectorAll('[data-dish-person]').forEach(chip=>{
+      chip.addEventListener('click', ()=>{
+        const id = chip.dataset.dishPerson;
+        if(dishFormLikedBy.includes(id)) dishFormLikedBy = dishFormLikedBy.filter(x=>x!==id);
+        else dishFormLikedBy.push(id);
+        renderDishPeoplePicker();
+      });
+    });
+  }
+  function renderDishIngredientsPicker(){
+    const el = document.getElementById('dish-ingredients-picker');
+    el.innerHTML = dishFormIngredients.map(ing=>`<span class="chip on">${escapeHtml(ing)} <span class="x" data-remove-dish-ing="${escapeHtml(ing)}">×</span></span>`).join('');
+    el.querySelectorAll('[data-remove-dish-ing]').forEach(x=>{
+      x.addEventListener('click', ()=>{ dishFormIngredients = dishFormIngredients.filter(i=>i!==x.dataset.removeDishIng); renderDishIngredientsPicker(); });
+    });
+  }
+  document.getElementById('dish-ingredient-input').addEventListener('keydown', e=>{
+    if(e.key==='Enter'){
+      const v = e.target.value.trim().toLowerCase();
+      if(v && !dishFormIngredients.includes(v)){ dishFormIngredients.push(v); e.target.value=''; renderDishIngredientsPicker(); }
+    }
+  });
+  function renderDishMealPicker(){
+    const el = document.getElementById('dish-meal-picker');
+    el.innerHTML = MEALS.map(m=>`<button type="button" class="chip ${dishFormMealTimes.includes(m)?'on':''}" data-dish-meal="${m}">${m}</button>`).join('');
+    el.querySelectorAll('[data-dish-meal]').forEach(chip=>{
+      chip.addEventListener('click', ()=>{
+        const m = chip.dataset.dishMeal;
+        if(dishFormMealTimes.includes(m)) dishFormMealTimes = dishFormMealTimes.filter(x=>x!==m);
+        else dishFormMealTimes.push(m);
+        renderDishMealPicker();
+      });
+    });
+  }
+  // A library of common dishes we can suggest. Room's own dishes are filtered out,
+  // and the rest are ranked by what the household already leans toward.
+  const DISH_CATALOG = [
+    // breakfast / tiffin
+    { name:'Besan Chilla', category:'breakfast', diet:'veg', mealTimes:['breakfast','dinner'], nutrition:{kcal:200,protein:10,carbs:22,fat:8} },
+    { name:'Uttapam', category:'breakfast', diet:'veg', mealTimes:['breakfast'], nutrition:{kcal:230,protein:6,carbs:38,fat:6} },
+    { name:'Masala Oats', category:'breakfast', diet:'veg', mealTimes:['breakfast'], nutrition:{kcal:220,protein:8,carbs:34,fat:6} },
+    { name:'Sabudana Khichdi', category:'breakfast', diet:'veg', mealTimes:['breakfast'], nutrition:{kcal:300,protein:4,carbs:50,fat:10} },
+    { name:'Aloo Sandwich', category:'breakfast', diet:'veg', mealTimes:['breakfast'], nutrition:{kcal:300,protein:7,carbs:44,fat:11} },
+    // veg mains
+    { name:'Dal Tadka', category:'dal', diet:'veg', mealTimes:['lunch','dinner'], nutrition:{kcal:200,protein:10,carbs:28,fat:6,fiber:6} },
+    { name:'Dal Makhani', category:'dal', diet:'veg', mealTimes:['lunch','dinner'], nutrition:{kcal:330,protein:12,carbs:30,fat:18,fiber:8} },
+    { name:'Rajma', category:'curry', diet:'veg', mealTimes:['lunch','dinner'], nutrition:{kcal:290,protein:13,carbs:40,fat:8,fiber:11} },
+    { name:'Chole', category:'curry', diet:'veg', mealTimes:['lunch','dinner'], nutrition:{kcal:300,protein:12,carbs:42,fat:9,fiber:10} },
+    { name:'Kadhi Pakora', category:'curry', diet:'veg', mealTimes:['lunch','dinner'], nutrition:{kcal:250,protein:8,carbs:22,fat:15} },
+    { name:'Bhindi Masala', category:'curry', diet:'veg', mealTimes:['lunch','dinner'], nutrition:{kcal:180,protein:4,carbs:14,fat:12,fiber:5} },
+    { name:'Aloo Gobi', category:'curry', diet:'veg', mealTimes:['lunch','dinner'], nutrition:{kcal:200,protein:5,carbs:24,fat:10,fiber:5} },
+    { name:'Mix Veg', category:'curry', diet:'veg', mealTimes:['lunch','dinner'], nutrition:{kcal:180,protein:5,carbs:20,fat:9,fiber:5} },
+    { name:'Palak Paneer', category:'paneer', diet:'veg', mealTimes:['lunch','dinner'], nutrition:{kcal:300,protein:14,carbs:12,fat:22,fiber:4} },
+    { name:'Matar Paneer', category:'paneer', diet:'veg', mealTimes:['lunch','dinner'], nutrition:{kcal:320,protein:14,carbs:18,fat:20,fiber:4} },
+    { name:'Jeera Rice', category:'rice', diet:'veg', mealTimes:['lunch','dinner'], nutrition:{kcal:280,protein:5,carbs:52,fat:6} },
+    { name:'Veg Pulao', category:'rice', diet:'veg', mealTimes:['lunch','dinner'], nutrition:{kcal:320,protein:7,carbs:55,fat:8,fiber:4} },
+    { name:'Curd Rice', category:'rice', diet:'veg', mealTimes:['lunch','dinner'], nutrition:{kcal:250,protein:7,carbs:40,fat:7} },
+    { name:'Lemon Rice', category:'rice', diet:'veg', mealTimes:['lunch','dinner'], nutrition:{kcal:270,protein:5,carbs:48,fat:7} },
+    // non-veg
+    { name:'Chicken Biryani', category:'rice', diet:'nonveg', mealTimes:['lunch','dinner'], nutrition:{kcal:450,protein:25,carbs:55,fat:15} },
+    { name:'Butter Chicken', category:'curry', diet:'nonveg', mealTimes:['lunch','dinner'], nutrition:{kcal:420,protein:27,carbs:12,fat:30} },
+    { name:'Fish Curry', category:'curry', diet:'nonveg', mealTimes:['lunch','dinner'], nutrition:{kcal:250,protein:24,carbs:8,fat:14} },
+    { name:'Egg Bhurji', category:'egg', diet:'nonveg', mealTimes:['breakfast','dinner'], nutrition:{kcal:220,protein:14,carbs:6,fat:16} },
+    { name:'Mutton Curry', category:'curry', diet:'nonveg', mealTimes:['lunch','dinner'], nutrition:{kcal:400,protein:26,carbs:8,fat:28} },
+  ];
+  function roomPrefs(){
+    const cats = {}; let veg=0, nonveg=0;
+    room.dishes.forEach(d=>{ cats[d.category]=(cats[d.category]||0)+1; if(dishDiet(d)==='nonveg') nonveg++; else veg++; });
+    return { cats, majorityDiet: nonveg>veg ? 'nonveg' : 'veg' };
+  }
+  function renderDishSuggestions(){
+    const el = document.getElementById('dish-suggestions');
+    const have = new Set(room.dishes.map(d=>d.name.toLowerCase()));
+    const { cats, majorityDiet } = roomPrefs();
+    const cands = DISH_CATALOG.filter(c=>!have.has(c.name.toLowerCase()))
+      .map(c=>({ c, score: (cats[c.category]?2:0) + (c.diet===majorityDiet?1:0) }))
+      .sort((a,b)=>b.score-a.score)
+      .slice(0,8)
+      .map(x=>x.c);
+    if(cands.length===0){ el.innerHTML=''; return; }
+    el.innerHTML = `<p class="hint" style="margin-top:0;">Suggested for your household — tap to fill the form:</p>
+      <div class="chip-row">${cands.map((c,i)=>`<button type="button" class="chip" data-suggest="${i}">${dietDot(c)}${escapeHtml(c.name)}</button>`).join('')}</div>`;
+    el.querySelectorAll('[data-suggest]').forEach(btn=>btn.addEventListener('click', ()=>fillFormFromCatalog(cands[+btn.dataset.suggest])));
+  }
+  function fillFormFromCatalog(c){
+    document.getElementById('dish-name').value = c.name;
+    document.getElementById('dish-category').value = c.category;
+    document.getElementById('dish-diet').value = c.diet;
+    document.getElementById('dish-cook-rating').value = 'unknown';
+    dishFormMealTimes = [...(c.mealTimes||[])]; renderDishMealPicker();
+    const n = c.nutrition || {};
+    document.getElementById('dish-kcal').value = n.kcal ?? '';
+    document.getElementById('dish-protein').value = n.protein ?? '';
+    document.getElementById('dish-carbs').value = n.carbs ?? '';
+    document.getElementById('dish-fat').value = n.fat ?? '';
+    document.getElementById('dish-name').scrollIntoView({behavior:'smooth', block:'center'});
+    document.getElementById('dish-name').focus();
+  }
+  document.getElementById('save-dish-btn').addEventListener('click', async ()=>{
+    const name = document.getElementById('dish-name').value.trim();
+    if(!name) return;
+    const category = document.getElementById('dish-category').value;
+    const diet = document.getElementById('dish-diet').value;
+    const cookRating = document.getElementById('dish-cook-rating').value;
+    const num = id => { const v = parseFloat(document.getElementById(id).value); return isNaN(v)?undefined:v; };
+    const nutrition = {
+      kcal: num('dish-kcal'), protein: num('dish-protein'),
+      carbs: num('dish-carbs'), fat: num('dish-fat')
+    };
+    const hasNutrition = Object.values(nutrition).some(v=>v!==undefined);
+    await api(`/room/${roomCode}/dishes`, 'POST', {
+      name, category, diet, cookRating,
+      mealTimes: [...dishFormMealTimes],
+      likedBy: [...dishFormLikedBy], ingredients: [...dishFormIngredients],
+      nutrition: hasNutrition ? nutrition : null
+    });
+    document.getElementById('dish-name').value='';
+    document.getElementById('dish-diet').value='veg';
+    ['dish-kcal','dish-protein','dish-carbs','dish-fat'].forEach(id=>document.getElementById(id).value='');
+    dishFormLikedBy = []; dishFormIngredients = []; dishFormMealTimes = [];
+    room = await api('/room/'+roomCode, 'GET');
+    renderDishPeoplePicker(); renderDishIngredientsPicker(); renderDishMealPicker();
+    renderCategoryFilter(); renderDishDietFilter(); renderDishList(); renderDishSuggestions(); renderPicks();
+  });
+
+  function renderCategoryFilter(){
+    const cats = ['all', ...new Set(room.dishes.map(d=>d.category))];
+    const labels = {all:'All', breakfast:'Breakfast', paratha:'Paratha', paneer:'Paneer', curry:'Curry', dal:'Dal', rice:'Rice', egg:'Egg', snack:'Snack', other:'Other'};
+    const el = document.getElementById('dish-category-filter');
+    el.innerHTML = cats.map(c=>`<button class="chip ${dishCategoryFilter===c?'on':''}" data-cat="${c}">${labels[c]||c}</button>`).join('');
+    el.querySelectorAll('[data-cat]').forEach(chip=>{
+      chip.addEventListener('click', ()=>{ dishCategoryFilter = chip.dataset.cat; renderCategoryFilter(); renderDishList(); });
+    });
+  }
+  function renderDishDietFilter(){
+    const el = document.getElementById('dish-diet-filter');
+    const opts = [['all','All'],['veg','Veg'],['nonveg','Non-veg']];
+    el.innerHTML = opts.map(([v,l])=>`<button class="chip ${dishDietFilter===v?'on':''}" data-ddf="${v}">${l}</button>`).join('');
+    el.querySelectorAll('[data-ddf]').forEach(b=>b.addEventListener('click', ()=>{ dishDietFilter=b.dataset.ddf; renderDishDietFilter(); renderDishList(); }));
+  }
+  function renderDishList(){
+    const el = document.getElementById('dish-list');
+    let filtered = dishCategoryFilter==='all' ? room.dishes : room.dishes.filter(d=>d.category===dishCategoryFilter);
+    if(dishDietFilter!=='all') filtered = filtered.filter(d=>dishDiet(d)===dishDietFilter);
+    if(filtered.length===0){ el.innerHTML = '<div class="empty">No dishes here yet.</div>'; return; }
+    const ratingLabel = {great:'Great', okay:'Okay', unknown:"Doesn't know", avoid:'Avoid'};
+    el.innerHTML = filtered.map(d=>{
+      const likedNames = d.likedBy.map(id=> room.people.find(p=>p.id===id)?.name).filter(Boolean);
+      const mealTags = dishMealTimes(d).map(m=>`<span class="meal-tag">${m}</span>`).join('');
+      const rateOpts = ['great','okay','unknown','avoid'].map(v=>`<option value="${v}" ${d.cookRating===v?'selected':''}>${ratingLabel[v]}</option>`).join('');
+      return `<div class="dish-row">
+        <div><div class="dish-row-name">${dietDot(d)}${escapeHtml(d.name)} <span class="badge ${d.cookRating}">${ratingLabel[d.cookRating]}</span></div>
+        <div class="dish-row-meta">${likedNames.length? escapeHtml(likedNames.join(', ')) : 'No one tagged'} · made ${d.timesMade||0}×${d.nutrition?' · '+(d.nutrition.kcal||0)+' kcal':''}</div>
+        ${mealTags?`<div style="margin-top:4px;">${mealTags}</div>`:''}
+        <div class="dish-edit"><span class="dish-edit-label">Cook makes it</span>
+          <select class="rate-select" data-rate-dish="${d.id}">${rateOpts}</select>
+        </div></div>
+        <button class="icon-btn" data-delete-dish="${d.id}">Delete</button>
+      </div>`;
+    }).join('');
+    el.querySelectorAll('[data-rate-dish]').forEach(sel=>{
+      sel.addEventListener('change', async ()=>{
+        await api(`/room/${roomCode}/dishes/${sel.dataset.rateDish}`, 'PUT', {cookRating: sel.value});
+        room = await api('/room/'+roomCode, 'GET');
+        renderDishList(); renderPicks();
+      });
+    });
+    el.querySelectorAll('[data-delete-dish]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        await api(`/room/${roomCode}/dishes/${btn.dataset.deleteDish}`, 'DELETE');
+        room = await api('/room/'+roomCode, 'GET');
+        renderCategoryFilter(); renderDishList(); renderPicks();
+      });
+    });
+  }
+
+  // ---------- WEEK SUMMARY ----------
+  function renderWeek(){
+    const el = document.getElementById('week-summary');
+    const recentlyMade = room.dishes.filter(d=> d.lastMade && daysSince(d.lastMade) <= 7);
+    if(recentlyMade.length===0){ el.innerHTML = '<div class="empty">Nothing marked "made today" in the last 7 days yet.</div>'; return; }
+    const totals = recentlyMade.reduce((acc,d)=>{
+      const n = d.nutrition || {};
+      acc.kcal += n.kcal||0; acc.protein += n.protein||0; acc.carbs += n.carbs||0; acc.fat += n.fat||0;
+      return acc;
+    }, {kcal:0, protein:0, carbs:0, fat:0});
+    el.innerHTML = `
+      <div class="nutrition-row" style="font-size:13px;">
+        <span><b>${Math.round(totals.kcal)}</b> kcal</span>
+        <span><b>${Math.round(totals.protein)}g</b> protein</span>
+        <span><b>${Math.round(totals.carbs)}g</b> carbs</span>
+        <span><b>${Math.round(totals.fat)}g</b> fat</span>
+      </div>
+      <div class="hint" style="margin-top:10px;">From: ${recentlyMade.map(d=>escapeHtml(d.name)).join(', ')}</div>
+    `;
+  }
+
+  function renderAll(){
+    renderNowBar(); renderDayTabs(); renderMealTabs(); renderPicksDietFilter();
+    renderPlan();
+    renderTodayPeoplePicker(); renderTodayIngredients(); renderPicks();
+    renderDishPeoplePicker(); renderDishIngredientsPicker(); renderDishMealPicker();
+    renderCategoryFilter(); renderDishDietFilter(); renderDishList(); renderDishSuggestions();
+    renderPeopleList();
+    document.getElementById('cook-language').value = room.cookLanguage || '';
+  }
+
+  // keep the clock / "next meal" fresh
+  setInterval(()=>{ if(room) renderNowBar(); }, 30000);
+
+  // auto-rejoin if we have a saved room code
+  if(roomCode){ tryEnterRoom(roomCode); }
+})();
+</script>
+</body>
+</html>

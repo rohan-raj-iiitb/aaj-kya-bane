@@ -1,0 +1,13 @@
+{
+  "name": "aaj-kya-bane",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Household meal-decision app — zero dependencies, Node.js only.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}

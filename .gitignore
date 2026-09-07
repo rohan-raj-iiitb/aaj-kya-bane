@@ -1,0 +1,8 @@
+# local database — never commit real data; the server recreates it on first run
+data.json
+
+# logs & OS/editor cruft
+*.log
+node_modules/
+.DS_Store
+Thumbs.db

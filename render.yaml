@@ -1,0 +1,17 @@
+# Optional Render Blueprint. You can either use this file (Render → "New +" →
+# "Blueprint" → pick your repo) OR set the same values by hand in the dashboard
+# (see DEPLOY.md). If Render rejects "runtime: node", change it to "env: node".
+services:
+  - type: web
+    name: aaj-kya-bane
+    runtime: node
+    plan: starter          # a persistent disk requires a paid plan; use "free" for a no-disk trial (data resets on redeploy)
+    buildCommand: ""        # nothing to build — zero dependencies
+    startCommand: node server.js
+    envVars:
+      - key: DATA_DIR
+        value: /var/data
+    disk:
+      name: data
+      mountPath: /var/data  # data.json is stored here so it survives restarts
+      sizeGB: 1
