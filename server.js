@@ -81,7 +81,7 @@ function createRoom(db) {
     createdAt: new Date().toISOString(),
     cookLanguage: '',
     cookPhone: '', // didi's WhatsApp number (digits only, incl. country code)
-    people: [{ id: newId(), name: 'Me', meals: normalizeMeals() }],
+    people: [{ id: newId(), name: 'Me', meals: normalizeMeals(), phone: '' }],
     dishes: SEED_DISHES.map(d => ({
       id: newId(),
       name: d.name,
@@ -190,7 +190,7 @@ const server = http.createServer(async (req, res) => {
           const body = await readBody(req);
           const name = (body.name || '').trim();
           if (!name) return sendJSON(res, 400, { error: 'Name required' });
-          const person = { id: newId(), name, meals: normalizeMeals(body.meals) };
+          const person = { id: newId(), name, meals: normalizeMeals(body.meals), phone: (body.phone || '').replace(/\D/g, '') };
           room.people.push(person);
           saveDB(db);
           return sendJSON(res, 200, person);
@@ -202,6 +202,7 @@ const server = http.createServer(async (req, res) => {
           const body = await readBody(req);
           if (typeof body.name === 'string' && body.name.trim()) person.name = body.name.trim();
           if (body.meals) person.meals = normalizeMeals(body.meals);
+          if (typeof body.phone === 'string') person.phone = body.phone.replace(/\D/g, '');
           saveDB(db);
           return sendJSON(res, 200, person);
         }
@@ -268,12 +269,23 @@ const server = http.createServer(async (req, res) => {
           const date = (typeof body.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.date))
             ? body.date : new Date().toISOString().slice(0, 10);
           // dedupe: one request per (date, meal, dish)
+          const status = body.status === 'proposed' ? 'proposed' : 'agreed';
+          const proposedBy = typeof body.proposedBy === 'string' ? body.proposedBy : null;
           let entry = room.plan.find(p => p.date === date && p.meal === meal && p.dishId === dish.id);
           if (!entry) {
-            entry = { id: newId(), date, meal, dishId: dish.id, dishName: dish.name, createdAt: new Date().toISOString() };
+            entry = { id: newId(), date, meal, dishId: dish.id, dishName: dish.name, status, proposedBy, createdAt: new Date().toISOString() };
             room.plan.push(entry);
             saveDB(db);
           }
+          return sendJSON(res, 200, entry);
+        }
+        // PUT /api/room/:code/plan/:id -> update status (e.g. household agreed)
+        if (req.method === 'PUT' && parts.length === 5) {
+          const entry = room.plan.find(p => p.id === parts[4]);
+          if (!entry) return sendJSON(res, 404, { error: 'Plan item not found' });
+          const body = await readBody(req);
+          if (body.status === 'proposed' || body.status === 'agreed') entry.status = body.status;
+          saveDB(db);
           return sendJSON(res, 200, entry);
         }
         if (req.method === 'DELETE' && parts.length === 5) {

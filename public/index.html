@@ -48,7 +48,10 @@ button.btn{font-family:'Inter',sans-serif;font-size:14.5px;font-weight:600;paddi
 button.btn.secondary{background:var(--white);color:var(--ink);border:1px solid var(--card-line);}
 button.btn.small{padding:7px 12px;font-size:13px;width:auto;}
 
-.room-banner{display:flex;justify-content:space-between;align-items:center;background:var(--card);border:1px solid var(--card-line);border-radius:8px;padding:10px 14px;margin-bottom:18px;font-size:13.5px;}
+.room-banner{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;background:var(--card);border:1px solid var(--card-line);border-radius:8px;padding:10px 14px;margin-bottom:18px;font-size:13.5px;}
+.you-are select{width:auto;padding:3px 6px;font-size:13px;display:inline-block;}
+.plan-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;}
+.person-phone{margin-top:7px;max-width:230px;}
 .room-banner b{font-family:'Fraunces',serif;letter-spacing:1px;}
 .room-banner button{background:none;border:none;color:var(--ink-soft);text-decoration:underline;font-size:13px;cursor:pointer;}
 
@@ -189,7 +192,8 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
 
 <div class="wrap" id="app" style="display:none;">
   <div class="room-banner">
-    <span>Room code: <b id="room-code-display"></b></span>
+    <span>Room: <b id="room-code-display"></b></span>
+    <span class="you-are">You’re <select id="me-select"></select></span>
     <button id="leave-btn">Switch room</button>
   </div>
 
@@ -228,7 +232,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     <div id="plan-box"></div>
 
     <h2 class="section-title" style="margin-top:22px;">Suggestions</h2>
-    <p class="hint">Tap “Let’s get it made” to request a dish for the day &amp; meal above — it saves the plan and messages didi.</p>
+    <p class="hint">Tap “Propose to household” to run a dish by your family on WhatsApp. Once they tap Agree, you can send it to the cook.</p>
     <button class="btn" id="decide-btn" style="margin-bottom:14px;">🎲 Decide for me</button>
     <div id="decide-result"></div>
     <div class="filter-row" id="picks-diet-filter"></div>
@@ -328,6 +332,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
   const MEALS = ['breakfast', 'lunch', 'dinner'];
   let roomCode = localStorage.getItem('aajkyabane-room') || '';
   let room = null;
+  let myId = '';   // which household member is using this device (per-room, in localStorage)
   let selectedMeal = mealPlan().meal;   // which meal we're planning for
   let selectedDay = mealPlan().when;    // 'today' | 'tomorrow'
   let selectedTodayPeople = [];
@@ -420,6 +425,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
       room = await api('/room/'+code, 'GET');
       roomCode = code;
       localStorage.setItem('aajkyabane-room', code);
+      myId = localStorage.getItem('aajkyabane-me-'+roomCode) || '';
       document.getElementById('gate').style.display='none';
       document.getElementById('app').style.display='block';
       document.getElementById('room-code-display').textContent = roomCode;
@@ -441,6 +447,8 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     room = await api('/room','POST');
     roomCode = room.code;
     localStorage.setItem('aajkyabane-room', roomCode);
+    myId = room.people[0] ? room.people[0].id : '';   // creator is the seeded "Me"
+    localStorage.setItem('aajkyabane-me-'+roomCode, myId);
     document.getElementById('gate').style.display='none';
     document.getElementById('app').style.display='block';
     document.getElementById('room-code-display').textContent = roomCode;
@@ -452,6 +460,18 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     location.reload();
   });
   document.getElementById('decide-btn').addEventListener('click', decideForMe);
+  document.getElementById('me-select').addEventListener('change', e=>{
+    myId = e.target.value;
+    localStorage.setItem('aajkyabane-me-'+roomCode, myId);
+    const meName = (room.people.find(p=>p.id===myId)||{}).name;
+    toast(myId ? ('You’re '+meName) : 'Cleared');
+    renderMeSelect(); renderPlan(); renderPicks(); renderDecideResult();
+  });
+  function renderMeSelect(){
+    if(myId && !room.people.some(p=>p.id===myId)) myId = '';
+    const sel = document.getElementById('me-select');
+    sel.innerHTML = '<option value="">— pick —</option>' + room.people.map(p=>`<option value="${p.id}" ${p.id===myId?'selected':''}>${escapeHtml(p.name)}</option>`).join('');
+  }
 
   document.querySelectorAll('.tab').forEach(tab=>{
     tab.addEventListener('click', ()=>{
@@ -511,39 +531,63 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
   }
   function renderPlan(){
     const dayWord = selectedDay==='tomorrow' ? 'tomorrow' : 'today';
-    document.getElementById('plan-title').textContent = `Requested for ${dayWord}’s ${selectedMeal}`;
+    document.getElementById('plan-title').textContent = `Deciding for ${dayWord}’s ${selectedMeal}`;
     const box = document.getElementById('plan-box');
     const entries = (room.plan||[]).filter(p=>p.date===isoForDay(selectedDay)&&p.meal===selectedMeal);
-    if(entries.length===0){ box.innerHTML = `<div class="empty">Nothing requested yet — tap “Let’s get it made” on a suggestion below.</div>`; return; }
+    if(entries.length===0){
+      const who = otherMembers()[0] ? escapeHtml(otherMembers()[0].name) : 'your household';
+      box.innerHTML = `<div class="empty">Nothing yet — tap “Propose to household” on a suggestion below to run it by ${who}.</div>`;
+      return;
+    }
     box.innerHTML = entries.map(p=>{
       const dish = room.dishes.find(d=>d.id===p.dishId);
-      return `<div class="dish-row">
-        <div><div class="dish-row-name">${dish?dietDot(dish):''}${escapeHtml(p.dishName)}</div>
-        <div class="dish-row-meta">Requested for ${dayWord} · ${selectedMeal}</div></div>
-        <div style="display:flex;gap:6px;align-items:center;">
-          <button class="btn small secondary" data-made-plan="${p.id}:${p.dishId}">✓ Made</button>
-          <button class="icon-btn" data-remove-plan="${p.id}">Remove</button>
+      const agreed = (p.status||'agreed')==='agreed';
+      const proposer = room.people.find(x=>x.id===p.proposedBy);
+      const statusChip = agreed ? '<span class="badge great">Agreed</span>' : '<span class="badge">Waiting to agree</span>';
+      const meta = agreed
+        ? 'Everyone’s in — ready for the cook'
+        : ('Proposed'+(proposer?' by '+escapeHtml(proposer.name):'')+' · waiting for the household to agree');
+      const actions = agreed
+        ? `<button class="btn small" data-cook-plan="${p.id}:${p.dishId}">Send to cook 📩</button>
+           <button class="btn small secondary" data-made-plan="${p.id}:${p.dishId}">✓ Made</button>`
+        : `<button class="btn small" data-agree-plan="${p.id}">Agree ✅</button>
+           <button class="btn small secondary" data-nudge-plan="${p.dishId}">Nudge 📩</button>`;
+      return `<div class="dish-row" style="align-items:flex-start;">
+        <div>
+          <div class="dish-row-name">${dish?dietDot(dish):''}${escapeHtml(p.dishName)} ${statusChip}</div>
+          <div class="dish-row-meta">${meta}</div>
+          <div class="plan-actions">${actions}<button class="icon-btn" data-remove-plan="${p.id}">Remove</button></div>
         </div>
       </div>`;
     }).join('');
-    box.querySelectorAll('[data-made-plan]').forEach(btn=>{
-      btn.addEventListener('click', async ()=>{
-        const [pid, dishId] = btn.dataset.madePlan.split(':');
-        await api(`/room/${roomCode}/dishes/${dishId}`, 'PUT', {markMadeToday:true});
-        await api(`/room/${roomCode}/plan/${pid}`, 'DELETE');
-        room = await api('/room/'+roomCode, 'GET');
-        toast('Marked as made ✓');
-        renderPlan(); renderPicks();
-      });
-    });
-    box.querySelectorAll('[data-remove-plan]').forEach(btn=>{
-      btn.addEventListener('click', async ()=>{
-        await api(`/room/${roomCode}/plan/${btn.dataset.removePlan}`, 'DELETE');
-        room = await api('/room/'+roomCode, 'GET');
-        toast('Removed');
-        renderPlan(); renderPicks();
-      });
-    });
+    box.querySelectorAll('[data-agree-plan]').forEach(btn=>btn.addEventListener('click', async ()=>{
+      await api(`/room/${roomCode}/plan/${btn.dataset.agreePlan}`, 'PUT', {status:'agreed'});
+      room = await api('/room/'+roomCode, 'GET');
+      toast('Agreed ✅ — you can send it to the cook now');
+      renderPlan(); renderPicks(); renderDecideResult();
+    }));
+    box.querySelectorAll('[data-nudge-plan]').forEach(btn=>btn.addEventListener('click', ()=>{
+      const dish = room.dishes.find(d=>d.id===btn.dataset.nudgePlan);
+      if(dish) proposeViaWhatsApp(dish);
+    }));
+    box.querySelectorAll('[data-cook-plan]').forEach(btn=>btn.addEventListener('click', ()=>{
+      const dish = room.dishes.find(d=>d.id===btn.dataset.cookPlan.split(':')[1]);
+      if(dish) tellDidi(dish);
+    }));
+    box.querySelectorAll('[data-made-plan]').forEach(btn=>btn.addEventListener('click', async ()=>{
+      const [pid, dishId] = btn.dataset.madePlan.split(':');
+      await api(`/room/${roomCode}/dishes/${dishId}`, 'PUT', {markMadeToday:true});
+      await api(`/room/${roomCode}/plan/${pid}`, 'DELETE');
+      room = await api('/room/'+roomCode, 'GET');
+      toast('Marked as made ✓');
+      renderPlan(); renderPicks();
+    }));
+    box.querySelectorAll('[data-remove-plan]').forEach(btn=>btn.addEventListener('click', async ()=>{
+      await api(`/room/${roomCode}/plan/${btn.dataset.removePlan}`, 'DELETE');
+      room = await api('/room/'+roomCode, 'GET');
+      toast('Removed');
+      renderPlan(); renderPicks(); renderDecideResult();
+    }));
   }
   // ---------- WEEKLY PLAN TAB ----------
   function renderWeekPlan(){
@@ -653,10 +697,18 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
           <div class="dish-row-name">${escapeHtml(p.name)}</div>
           <div class="dish-row-meta">Home for these meals — tap to change</div>
           <div class="person-meals">${MEALS.map(m=>`<button class="mini ${pm[m]?'on':''}" data-person-meal="${p.id}:${m}">${m}</button>`).join('')}</div>
+          <input class="person-phone" type="text" inputmode="tel" placeholder="WhatsApp no. — for proposals" value="${p.phone?escapeHtml(p.phone):''}" data-person-phone="${p.id}" />
         </div>
         <button class="icon-btn" data-remove-person="${p.id}">Remove</button>
       </div>`;
     }).join('');
+    el.querySelectorAll('[data-person-phone]').forEach(inp=>{
+      inp.addEventListener('change', async ()=>{
+        await api(`/room/${roomCode}/people/${inp.dataset.personPhone}`, 'PUT', {phone: inp.value});
+        room = await api('/room/'+roomCode, 'GET');
+        toast('Number saved ✓');
+      });
+    });
     el.querySelectorAll('[data-remove-person]').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
         const p = room.people.find(x=>x.id===btn.dataset.removePerson);
@@ -775,21 +827,35 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
       </div>
       ${nutritionLine(d.nutrition)}
       <div class="pick-actions">
-        <button class="btn small ${isPlanned(d.id)?'secondary':''}" data-request="${d.id}">${isPlanned(d.id)?'✓ In plan · remind didi':'Let’s get it made'}</button>
+        <button class="btn small ${isPlanned(d.id)?'secondary':''}" data-propose="${d.id}">${isPlanned(d.id)?'✓ Shared · ask again':'Propose to household'}</button>
       </div>
     </div>`;
   }
   function bindPickActions(container){
-    container.querySelectorAll('[data-request]').forEach(btn=>{
-      btn.addEventListener('click', async ()=>{
-        const dish = room.dishes.find(x=>x.id===btn.dataset.request);
-        await api(`/room/${roomCode}/plan`, 'POST', {date: isoForDay(selectedDay), meal: selectedMeal, dishId: dish.id});
-        room = await api('/room/'+roomCode, 'GET');
-        tellDidi(dish);
-        toast('Added to plan · messaging didi 📩');
-        renderPlan(); renderPicks(); renderDecideResult();
-      });
+    container.querySelectorAll('[data-propose]').forEach(btn=>{
+      btn.addEventListener('click', ()=> proposeDish(room.dishes.find(x=>x.id===btn.dataset.propose)));
     });
+  }
+  function otherMembers(){ return room.people.filter(p=>p.id!==myId); }
+  function proposeViaWhatsApp(dish){
+    const meName = (room.people.find(p=>p.id===myId)||{}).name;
+    const whenWord = selectedDay==='tomorrow' ? 'tomorrow' : 'today';
+    const intro = meName ? `${meName} here — ` : '';
+    const msg = `${intro}thinking of ${dish.name} for ${whenWord}'s ${selectedMeal}. Same for you, or something else in mind? Open the app to agree or suggest: ${location.origin}`;
+    const withPhone = otherMembers().filter(p=>p.phone);
+    const base = withPhone.length===1 ? 'https://wa.me/'+withPhone[0].phone+'?text=' : 'https://wa.me/?text=';
+    window.open(base + encodeURIComponent(msg), '_blank');
+  }
+  async function proposeDish(dish){
+    if(!dish) return;
+    const solo = otherMembers().length===0;
+    if(!isPlanned(dish.id)){
+      await api(`/room/${roomCode}/plan`, 'POST', {date: isoForDay(selectedDay), meal: selectedMeal, dishId: dish.id, status: solo?'agreed':'proposed', proposedBy: myId||undefined});
+      room = await api('/room/'+roomCode, 'GET');
+    }
+    if(solo){ toast('Added — ready for the cook'); }
+    else { proposeViaWhatsApp(dish); toast('Shared with household 📩'); }
+    renderPlan(); renderPicks(); renderDecideResult();
   }
   function rankedPool(limit){
     let pool = room.dishes.filter(d=>dishSuitsMeal(d, selectedMeal));
@@ -1080,6 +1146,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
 
   function renderAll(){
     decidedId = null;
+    renderMeSelect();
     renderNowBar(); renderDayTabs(); renderMealTabs(); renderPicksDietFilter();
     renderPlan(); renderDecideResult();
     renderTodayPeoplePicker(); renderTodayIngredients(); renderPicks();
