@@ -68,6 +68,9 @@ h2.section-title{font-family:'Fraunces',serif;font-weight:500;font-size:18px;mar
 
 input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9px 11px;border:1px solid var(--card-line);border-radius:8px;background:var(--white);color:var(--ink);width:100%;}
 .tag-input-row{display:flex;gap:8px;margin-bottom:8px;}
+.tag-input-row input{flex:1;min-width:0;}
+.nut-field{display:flex;flex-direction:column;gap:3px;}
+.nut-label{font-size:11px;color:var(--ink-soft);font-weight:600;}
 
 .pick-card{background:var(--card);border:1px solid var(--card-line);border-left:4px solid var(--gold);border-radius:6px;padding:14px 16px;margin-bottom:12px;}
 .pick-card.great{border-left-color:var(--green);}
@@ -217,7 +220,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     <div class="chip-row" id="today-people"></div>
 
     <h2 class="section-title">What's fresh today? <span style="font-weight:400;color:var(--ink-soft);font-size:12.5px;">(optional)</span></h2>
-    <div class="tag-input-row"><input type="text" id="ingredient-input" placeholder="Add what's in the kitchen today" /></div>
+    <div class="tag-input-row"><input type="text" id="ingredient-input" placeholder="Add what's in the kitchen today" /><button class="btn" id="ingredient-add" style="width:auto;">Add</button></div>
     <div class="chip-row" id="today-ingredients"></div>
 
     <div class="section-divider"></div>
@@ -262,16 +265,16 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
         </select>
       </div>
       <div class="field"><label>Key ingredients (optional)</label>
-        <div class="tag-input-row"><input type="text" id="dish-ingredient-input" placeholder="Add an ingredient, press enter" /></div>
+        <div class="tag-input-row"><input type="text" id="dish-ingredient-input" placeholder="Add an ingredient" /><button class="btn" id="dish-ingredient-add" style="width:auto;">Add</button></div>
         <div class="chip-row" id="dish-ingredients-picker"></div>
       </div>
       <div class="field">
         <label>Approximate nutrition per serving <span style="font-weight:400;">(optional — for your own awareness, not medical advice)</span></label>
         <div class="grid4">
-          <input type="text" id="dish-kcal" placeholder="kcal" inputmode="numeric" />
-          <input type="text" id="dish-protein" placeholder="protein (g)" inputmode="numeric" />
-          <input type="text" id="dish-carbs" placeholder="carbs (g)" inputmode="numeric" />
-          <input type="text" id="dish-fat" placeholder="fat (g)" inputmode="numeric" />
+          <div class="nut-field"><label class="nut-label">kcal</label><input type="text" id="dish-kcal" placeholder="kcal" inputmode="numeric" /></div>
+          <div class="nut-field"><label class="nut-label">protein (g)</label><input type="text" id="dish-protein" placeholder="protein" inputmode="numeric" /></div>
+          <div class="nut-field"><label class="nut-label">carbs (g)</label><input type="text" id="dish-carbs" placeholder="carbs" inputmode="numeric" /></div>
+          <div class="nut-field"><label class="nut-label">fat (g)</label><input type="text" id="dish-fat" placeholder="fat" inputmode="numeric" /></div>
         </div>
       </div>
       <button class="btn" id="save-dish-btn" style="margin-top:6px;">Add dish</button>
@@ -722,12 +725,14 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
       x.addEventListener('click', ()=>{ todayIngredients = todayIngredients.filter(i=>i!==x.dataset.removeIng); renderTodayIngredients(); renderPicks(); });
     });
   }
-  document.getElementById('ingredient-input').addEventListener('keydown', e=>{
-    if(e.key==='Enter'){
-      const v = e.target.value.trim().toLowerCase();
-      if(v && !todayIngredients.includes(v)){ todayIngredients.push(v); e.target.value=''; renderTodayIngredients(); renderPicks(); }
-    }
-  });
+  function addTodayIngredient(){
+    const input = document.getElementById('ingredient-input');
+    const v = input.value.trim().toLowerCase();
+    if(v && !todayIngredients.includes(v)){ todayIngredients.push(v); renderTodayIngredients(); renderPicks(); }
+    input.value=''; input.focus();
+  }
+  document.getElementById('ingredient-input').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); addTodayIngredient(); } });
+  document.getElementById('ingredient-add').addEventListener('click', addTodayIngredient);
 
   function scoreDish(d){
     let likedFrac;
@@ -838,12 +843,14 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
       x.addEventListener('click', ()=>{ dishFormIngredients = dishFormIngredients.filter(i=>i!==x.dataset.removeDishIng); renderDishIngredientsPicker(); });
     });
   }
-  document.getElementById('dish-ingredient-input').addEventListener('keydown', e=>{
-    if(e.key==='Enter'){
-      const v = e.target.value.trim().toLowerCase();
-      if(v && !dishFormIngredients.includes(v)){ dishFormIngredients.push(v); e.target.value=''; renderDishIngredientsPicker(); }
-    }
-  });
+  function addDishIngredient(){
+    const input = document.getElementById('dish-ingredient-input');
+    const v = input.value.trim().toLowerCase();
+    if(v && !dishFormIngredients.includes(v)){ dishFormIngredients.push(v); renderDishIngredientsPicker(); }
+    input.value=''; input.focus();
+  }
+  document.getElementById('dish-ingredient-input').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); addDishIngredient(); } });
+  document.getElementById('dish-ingredient-add').addEventListener('click', addDishIngredient);
   function renderDishMealPicker(){
     const el = document.getElementById('dish-meal-picker');
     el.innerHTML = MEALS.map(m=>`<button type="button" class="chip ${dishFormMealTimes.includes(m)?'on':''}" data-dish-meal="${m}">${m}</button>`).join('');
@@ -1000,7 +1007,10 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
   }
   function renderDishList(){
     const el = document.getElementById('dish-list');
-    let filtered = dishCategoryFilter==='all' ? room.dishes : room.dishes.filter(d=>d.category===dishCategoryFilter);
+    let filtered;
+    if(dishCategoryFilter==='all') filtered = room.dishes;
+    else if(dishCategoryFilter==='breakfast') filtered = room.dishes.filter(d=>d.category==='breakfast' || dishMealTimes(d).includes('breakfast')); // category OR breakfast-tagged
+    else filtered = room.dishes.filter(d=>d.category===dishCategoryFilter);
     if(dishDietFilter!=='all') filtered = filtered.filter(d=>dishDiet(d)===dishDietFilter);
     if(filtered.length===0){ el.innerHTML = '<div class="empty">No dishes here yet.</div>'; return; }
     const ratingLabel = {great:'Great', okay:'Okay', unknown:"Doesn't know", avoid:'Avoid'};
