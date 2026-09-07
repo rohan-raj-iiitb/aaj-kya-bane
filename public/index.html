@@ -52,6 +52,8 @@ button.btn.small{padding:7px 12px;font-size:13px;width:auto;}
 .you-are select{width:auto;padding:3px 6px;font-size:13px;display:inline-block;}
 .plan-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;}
 .person-phone{margin-top:7px;max-width:230px;}
+.person-name-input{font-family:'Fraunces',serif;font-weight:600;font-size:15.5px;border:1px solid transparent;background:transparent;padding:2px 5px;border-radius:6px;width:100%;max-width:230px;color:var(--ink);}
+.person-name-input:focus{border-color:var(--card-line);background:var(--white);outline:none;}
 .room-banner b{font-family:'Fraunces',serif;letter-spacing:1px;}
 .room-banner button{background:none;border:none;color:var(--ink-soft);text-decoration:underline;font-size:13px;cursor:pointer;}
 
@@ -295,8 +297,13 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     <div class="person-add-row"><input type="text" id="person-name" placeholder="Add a name" /><button class="btn" id="add-person-btn" style="width:auto;">Add</button></div>
     <div id="people-list"></div>
     <div class="section-divider"></div>
-    <h2 class="section-title">Didi's WhatsApp number</h2>
-    <p class="hint">If set, “Let’s get it made” opens straight to her chat. Include country code, e.g. 91XXXXXXXXXX.</p>
+    <h2 class="section-title">Your cook</h2>
+    <p class="hint">What do you call your cook? Used to address them in WhatsApp messages — e.g. Didi, Bhaiya, or a name.</p>
+    <div class="tag-input-row">
+      <input type="text" id="cook-name" placeholder="e.g. Didi, Bhaiya, Ramesh" />
+      <button class="btn" id="save-cookname-btn" style="width:auto;">Save</button>
+    </div>
+    <p class="hint" style="margin-top:12px;">Cook's WhatsApp number — if set, messages open straight to their chat. Include country code, e.g. 91XXXXXXXXXX.</p>
     <div class="tag-input-row">
       <input type="text" id="cook-phone" placeholder="e.g. 919876543210" inputmode="tel" />
       <button class="btn" id="save-phone-btn" style="width:auto;">Save</button>
@@ -520,7 +527,8 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
   }
   function tellDidi(dish){
     const whenWord = selectedDay==='tomorrow' ? 'tomorrow' : 'today';
-    let msg = `Didi 🙏 Can you please make ${dish.name} for ${selectedMeal} ${whenWord}?`;
+    const greeting = room.cookName || 'Namaste';
+    let msg = `${greeting} 🙏 Can you please make ${dish.name} for ${selectedMeal} ${whenWord}?`;
     if(dish.cookRating==='unknown'){
       const langSuffix = room.cookLanguage ? ' recipe in '+room.cookLanguage : ' recipe';
       const url = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(dish.name + langSuffix);
@@ -598,7 +606,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
       html += `<div class="week-box" style="margin-bottom:14px;">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;">
           <div class="dish-row-name">${dateLabel(n)}</div>
-          <button class="btn small secondary" data-msg-day="${date}" style="width:auto;">Message didi 📩</button>
+          <button class="btn small secondary" data-msg-day="${date}" style="width:auto;">Message cook 📩</button>
         </div>`;
       MEALS.forEach(meal=>{
         const entries = (room.plan||[]).filter(p=>p.date===date && p.meal===meal);
@@ -646,7 +654,8 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     if(entries.length===0){ toast('Nothing planned for that day'); return; }
     const n = Math.round((new Date(date) - new Date(isoForOffset(0))) / 86400000);
     const dayName = n===0?'today':n===1?'tomorrow':dateLabel(n);
-    let msg = `Didi 🙏 Here's the plan for ${dayName}:`;
+    const greeting = room.cookName || 'Namaste';
+    let msg = `${greeting} 🙏 Here's the plan for ${dayName}:`;
     MEALS.forEach(meal=>{
       const ds = entries.filter(p=>p.meal===meal).map(p=>p.dishName);
       if(ds.length) msg += `\n${meal[0].toUpperCase()+meal.slice(1)}: ${ds.join(', ')}`;
@@ -694,7 +703,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
       const pm = personMeals(p);
       return `<div class="dish-row" style="align-items:flex-start;">
         <div>
-          <div class="dish-row-name">${escapeHtml(p.name)}</div>
+          <input class="person-name-input" type="text" value="${escapeHtml(p.name)}" data-person-name="${p.id}" aria-label="Name" />
           <div class="dish-row-meta">Home for these meals — tap to change</div>
           <div class="person-meals">${MEALS.map(m=>`<button class="mini ${pm[m]?'on':''}" data-person-meal="${p.id}:${m}">${m}</button>`).join('')}</div>
           <input class="person-phone" type="text" inputmode="tel" placeholder="WhatsApp no. — for proposals" value="${p.phone?escapeHtml(p.phone):''}" data-person-phone="${p.id}" />
@@ -702,6 +711,16 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
         <button class="icon-btn" data-remove-person="${p.id}">Remove</button>
       </div>`;
     }).join('');
+    el.querySelectorAll('[data-person-name]').forEach(inp=>{
+      inp.addEventListener('change', async ()=>{
+        const name = inp.value.trim();
+        if(!name){ inp.value = (room.people.find(p=>p.id===inp.dataset.personName)||{}).name || ''; toast('Name can’t be empty'); return; }
+        await api(`/room/${roomCode}/people/${inp.dataset.personName}`, 'PUT', {name});
+        room = await api('/room/'+roomCode, 'GET');
+        toast('Name updated ✓');
+        renderAll();   // names appear in many places (picks, plan, identity, pickers)
+      });
+    });
     el.querySelectorAll('[data-person-phone]').forEach(inp=>{
       inp.addEventListener('change', async ()=>{
         await api(`/room/${roomCode}/people/${inp.dataset.personPhone}`, 'PUT', {phone: inp.value});
@@ -748,11 +767,17 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     room = await api(`/room/${roomCode}`, 'PUT', {cookLanguage: lang});
     toast('Saved ✓');
   });
+  document.getElementById('save-cookname-btn').addEventListener('click', async ()=>{
+    const name = document.getElementById('cook-name').value.trim();
+    room = await api(`/room/${roomCode}`, 'PUT', {cookName: name});
+    document.getElementById('cook-name').value = room.cookName || '';
+    toast(room.cookName ? ('Cook saved — “'+room.cookName+'” ✓') : 'Cleared');
+  });
   document.getElementById('save-phone-btn').addEventListener('click', async ()=>{
     const phone = document.getElementById('cook-phone').value.trim();
     room = await api(`/room/${roomCode}`, 'PUT', {cookPhone: phone});
     document.getElementById('cook-phone').value = room.cookPhone || '';
-    toast(room.cookPhone ? 'Didi’s number saved ✓' : 'Number cleared');
+    toast(room.cookPhone ? 'Cook’s number saved ✓' : 'Number cleared');
   });
 
   // ---------- TODAY ----------
@@ -1154,6 +1179,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     renderCategoryFilter(); renderDishDietFilter(); renderDishList(); renderDishSuggestions();
     renderPeopleList();
     document.getElementById('cook-language').value = room.cookLanguage || '';
+    document.getElementById('cook-name').value = room.cookName || '';
     document.getElementById('cook-phone').value = room.cookPhone || '';
   }
 

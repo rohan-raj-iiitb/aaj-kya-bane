@@ -80,7 +80,8 @@ function createRoom(db) {
     code,
     createdAt: new Date().toISOString(),
     cookLanguage: '',
-    cookPhone: '', // didi's WhatsApp number (digits only, incl. country code)
+    cookName: '',  // what the household calls the cook (e.g. Didi, Bhaiya, a name)
+    cookPhone: '', // cook's WhatsApp number (digits only, incl. country code)
     people: [{ id: newId(), name: 'Me', meals: normalizeMeals(), phone: '' }],
     dishes: SEED_DISHES.map(d => ({
       id: newId(),
@@ -179,6 +180,7 @@ const server = http.createServer(async (req, res) => {
       if (req.method === 'PUT' && parts.length === 3) {
         const body = await readBody(req);
         if (typeof body.cookLanguage === 'string') room.cookLanguage = body.cookLanguage;
+        if (typeof body.cookName === 'string') room.cookName = body.cookName.trim();
         if (typeof body.cookPhone === 'string') room.cookPhone = body.cookPhone.replace(/\D/g, ''); // digits only, wa.me-ready
         saveDB(db);
         return sendJSON(res, 200, room);
