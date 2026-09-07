@@ -80,6 +80,7 @@ function createRoom(db) {
     code,
     createdAt: new Date().toISOString(),
     cookLanguage: '',
+    cookPhone: '', // didi's WhatsApp number (digits only, incl. country code)
     people: [{ id: newId(), name: 'Me', meals: normalizeMeals() }],
     dishes: SEED_DISHES.map(d => ({
       id: newId(),
@@ -123,7 +124,10 @@ function readBody(req) {
   });
 }
 
-const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript', '.json': 'application/json' };
+const MIME = {
+  '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript', '.json': 'application/json',
+  '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.png': 'image/png',
+};
 
 function serveStatic(req, res) {
   let filePath = req.url === '/' ? '/index.html' : req.url;
@@ -175,6 +179,7 @@ const server = http.createServer(async (req, res) => {
       if (req.method === 'PUT' && parts.length === 3) {
         const body = await readBody(req);
         if (typeof body.cookLanguage === 'string') room.cookLanguage = body.cookLanguage;
+        if (typeof body.cookPhone === 'string') room.cookPhone = body.cookPhone.replace(/\D/g, ''); // digits only, wa.me-ready
         saveDB(db);
         return sendJSON(res, 200, room);
       }

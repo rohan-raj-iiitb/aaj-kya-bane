@@ -7,6 +7,11 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Aaj Kya Bane" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<meta name="theme-color" content="#C08415" />
+<link rel="icon" href="/icon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="/icon-180.png" />
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap');
 
@@ -68,6 +73,8 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
 .pick-card.great{border-left-color:var(--green);}
 .pick-card.avoid{border-left-color:var(--red);}
 .pick-card.unknown{border-left-color:var(--ink-soft);}
+.pick-card.chosen{border:2px solid var(--gold);border-left-width:4px;}
+.decide-label{font-size:12px;font-weight:600;color:var(--gold);text-transform:uppercase;letter-spacing:.05em;margin:2px 0 8px;}
 .pick-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
 .pick-name{font-family:'Fraunces',serif;font-weight:600;font-size:17px;}
 .pick-meta{font-size:12px;color:var(--ink-soft);margin-top:3px;}
@@ -117,6 +124,18 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
 .diet-dot.nonveg::after{background:var(--red);}
 .meal-tag{display:inline-block;font-size:10.5px;padding:1px 8px;border-radius:100px;background:var(--gold-soft);color:#7A5610;text-transform:capitalize;margin:2px 4px 0 0;}
 
+/* toast + loading bar */
+#toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--white);padding:10px 18px;border-radius:100px;font-size:13.5px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:50;box-shadow:0 6px 20px rgba(0,0,0,.18);max-width:80%;text-align:center;}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+#loadbar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--gold);z-index:60;opacity:0;transition:width .2s ease,opacity .3s ease;}
+#loadbar.on{opacity:1;}
+#confirm-backdrop{position:fixed;inset:0;background:rgba(43,29,20,.45);display:none;align-items:center;justify-content:center;z-index:70;padding:20px;}
+#confirm-backdrop.show{display:flex;}
+#confirm-box{background:var(--bg);border:1px solid var(--card-line);border-radius:12px;padding:22px;max-width:360px;width:100%;box-shadow:0 12px 44px rgba(0,0,0,.28);}
+#confirm-msg{font-size:15px;margin-bottom:18px;color:var(--ink);}
+#confirm-actions{display:flex;gap:10px;}
+#confirm-actions .btn{flex:1;}
+
 /* inline cook-rating editor on each dish row */
 .dish-edit{display:flex;align-items:center;gap:8px;margin-top:8px;}
 .dish-edit-label{font-size:11.5px;color:var(--ink-soft);}
@@ -126,9 +145,30 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
 .person-meals{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;}
 .person-meals .mini{font-size:11px;padding:3px 10px;border-radius:100px;border:1px solid var(--card-line);background:var(--white);color:var(--ink-soft);cursor:pointer;text-transform:capitalize;}
 .person-meals .mini.on{background:var(--green-soft);border-color:var(--green);color:var(--green);}
+
+/* weekly plan */
+.plan-meal-row{margin-bottom:12px;}
+.plan-meal-label{font-size:11.5px;font-weight:600;color:var(--ink-soft);text-transform:capitalize;margin-bottom:4px;}
+.plan-add{width:100%;}
+.shop-item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--card-line);font-size:14px;}
+.shop-item:last-child{border-bottom:none;}
+.shop-item input{width:18px;height:18px;flex:none;}
+.shop-item.checked label{text-decoration:line-through;color:var(--ink-soft);}
+.shop-item .count{margin-left:auto;font-size:11.5px;color:var(--ink-soft);}
 </style>
 </head>
 <body>
+<div id="loadbar"></div>
+<div id="toast"></div>
+<div id="confirm-backdrop">
+  <div id="confirm-box">
+    <div id="confirm-msg"></div>
+    <div id="confirm-actions">
+      <button class="btn secondary" id="confirm-no">Cancel</button>
+      <button class="btn" id="confirm-yes">Delete</button>
+    </div>
+  </div>
+</div>
 
 <div id="gate">
   <h1>Aaj Kya Bane</h1>
@@ -152,6 +192,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
 
   <div class="tabs">
     <button class="tab active" data-tab="today">Today</button>
+    <button class="tab" data-tab="plan">Plan</button>
     <button class="tab" data-tab="dishes">Dishes</button>
     <button class="tab" data-tab="people">People</button>
     <button class="tab" data-tab="week">This week</button>
@@ -185,12 +226,14 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
 
     <h2 class="section-title" style="margin-top:22px;">Suggestions</h2>
     <p class="hint">Tap “Let’s get it made” to request a dish for the day &amp; meal above — it saves the plan and messages didi.</p>
+    <button class="btn" id="decide-btn" style="margin-bottom:14px;">🎲 Decide for me</button>
+    <div id="decide-result"></div>
     <div class="filter-row" id="picks-diet-filter"></div>
     <div id="picks-list"></div>
   </div>
 
   <div class="panel" id="panel-dishes">
-    <h2 class="section-title">Add a dish</h2>
+    <h2 class="section-title" id="dish-form-title">Add a dish</h2>
     <div id="dish-suggestions"></div>
     <div class="dish-form">
       <div class="field"><label>Dish name</label><input type="text" id="dish-name" placeholder="e.g. Paneer Tikka Masala" /></div>
@@ -232,6 +275,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
         </div>
       </div>
       <button class="btn" id="save-dish-btn" style="margin-top:6px;">Add dish</button>
+      <button class="btn secondary" id="cancel-edit-btn" style="margin-top:6px;display:none;">Cancel edit</button>
     </div>
     <h2 class="section-title">Your dish list</h2>
     <div class="filter-row" id="dish-category-filter"></div>
@@ -244,12 +288,29 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     <div class="person-add-row"><input type="text" id="person-name" placeholder="Add a name" /><button class="btn" id="add-person-btn" style="width:auto;">Add</button></div>
     <div id="people-list"></div>
     <div class="section-divider"></div>
+    <h2 class="section-title">Didi's WhatsApp number</h2>
+    <p class="hint">If set, “Let’s get it made” opens straight to her chat. Include country code, e.g. 91XXXXXXXXXX.</p>
+    <div class="tag-input-row">
+      <input type="text" id="cook-phone" placeholder="e.g. 919876543210" inputmode="tel" />
+      <button class="btn" id="save-phone-btn" style="width:auto;">Save</button>
+    </div>
+    <div class="section-divider"></div>
     <h2 class="section-title">Cook's language</h2>
     <p class="hint">Used when generating a recipe search link, so results are more useful to your cook.</p>
     <div class="tag-input-row">
       <input type="text" id="cook-language" placeholder="e.g. Kannada, Odia, Hindi" />
       <button class="btn" id="save-language-btn" style="width:auto;">Save</button>
     </div>
+  </div>
+
+  <div class="panel" id="panel-plan">
+    <h2 class="section-title">Plan the week</h2>
+    <p class="hint">Tap ＋ to add a dish to any meal. Everything here is saved for the whole household.</p>
+    <div id="week-plan"></div>
+    <div class="section-divider"></div>
+    <h2 class="section-title">Shopping list · next 7 days</h2>
+    <p class="hint">Ingredients from everything planned above. Tick items as you buy — this checklist stays on your phone.</p>
+    <div id="shopping-list"></div>
   </div>
 
   <div class="panel" id="panel-week">
@@ -272,6 +333,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
   let dishFormLikedBy = [];
   let dishFormIngredients = [];
   let dishFormMealTimes = [];
+  let editingDishId = null;   // set when the form is editing an existing dish
   let dishCategoryFilter = 'all';
   let dishDietFilter = 'all';
 
@@ -294,23 +356,60 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
   function dishSuitsMeal(d, meal){ const mt=dishMealTimes(d); return mt.length===0 || mt.includes(meal); } // untagged = any meal
   function dishDiet(d){ return d.diet==='nonveg' ? 'nonveg' : 'veg'; }
   function dietDot(d){ return `<span class="diet-dot ${dishDiet(d)==='nonveg'?'nonveg':''}"></span>`; }
-  function isoForDay(day){
-    const d = new Date();
-    if(day==='tomorrow') d.setDate(d.getDate()+1);
+  function isoForOffset(n){
+    const d = new Date(); d.setDate(d.getDate()+n);
     const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), da=String(d.getDate()).padStart(2,'0');
-    return `${y}-${m}-${da}`; // local date, so "tomorrow" means the user's tomorrow
+    return `${y}-${m}-${da}`; // local date
+  }
+  function isoForDay(day){ return isoForOffset(day==='tomorrow' ? 1 : 0); }
+  function dateLabel(n){
+    const d = new Date(); d.setDate(d.getDate()+n);
+    const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const rel = n===0?'Today':n===1?'Tomorrow':days[d.getDay()];
+    return `${rel} · ${d.getDate()} ${months[d.getMonth()]}`;
   }
   function isPlanned(dishId){ return (room.plan||[]).some(p=>p.date===isoForDay(selectedDay)&&p.meal===selectedMeal&&p.dishId===dishId); }
 
-  async function api(path, method, body){
-    const res = await fetch('/api'+path, {
-      method: method||'GET',
-      headers: body ? {'Content-Type':'application/json'} : {},
-      body: body ? JSON.stringify(body) : undefined
+  // --- toast + top loading bar ---
+  let _toastTimer = null;
+  function toast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(_toastTimer); _toastTimer = setTimeout(()=>t.classList.remove('show'), 2200);
+  }
+  function confirmDialog(msg, yesLabel){
+    return new Promise(resolve=>{
+      const bd = document.getElementById('confirm-backdrop');
+      const yes = document.getElementById('confirm-yes'), no = document.getElementById('confirm-no');
+      document.getElementById('confirm-msg').textContent = msg;
+      yes.textContent = yesLabel || 'Delete';
+      bd.classList.add('show');
+      const cleanup = (val)=>{ bd.classList.remove('show'); yes.removeEventListener('click', onYes); no.removeEventListener('click', onNo); bd.removeEventListener('click', onBackdrop); resolve(val); };
+      const onYes = ()=>cleanup(true), onNo = ()=>cleanup(false);
+      const onBackdrop = (e)=>{ if(e.target===bd) cleanup(false); };
+      yes.addEventListener('click', onYes); no.addEventListener('click', onNo); bd.addEventListener('click', onBackdrop);
     });
-    const data = await res.json();
-    if(!res.ok) throw new Error(data.error||'Request failed');
-    return data;
+  }
+  let _inflight = 0;
+  function loadStart(){ _inflight++; const b=document.getElementById('loadbar'); b.classList.add('on'); b.style.width='70%'; }
+  function loadEnd(){
+    _inflight = Math.max(0, _inflight-1);
+    if(_inflight===0){ const b=document.getElementById('loadbar'); b.style.width='100%'; setTimeout(()=>{ b.classList.remove('on'); b.style.width='0'; }, 250); }
+  }
+
+  async function api(path, method, body){
+    loadStart();
+    try{
+      const res = await fetch('/api'+path, {
+        method: method||'GET',
+        headers: body ? {'Content-Type':'application/json'} : {},
+        body: body ? JSON.stringify(body) : undefined
+      });
+      const data = await res.json();
+      if(!res.ok) throw new Error(data.error||'Request failed');
+      return data;
+    } finally { loadEnd(); }
   }
 
   async function tryEnterRoom(code){
@@ -349,6 +448,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     localStorage.removeItem('aajkyabane-room');
     location.reload();
   });
+  document.getElementById('decide-btn').addEventListener('click', decideForMe);
 
   document.querySelectorAll('.tab').forEach(tab=>{
     tab.addEventListener('click', ()=>{
@@ -357,6 +457,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
       tab.classList.add('active');
       document.getElementById('panel-'+tab.dataset.tab).classList.add('active');
       if(tab.dataset.tab === 'week') renderWeek();
+      if(tab.dataset.tab === 'plan') renderWeekPlan();
     });
   });
 
@@ -380,7 +481,8 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     el.innerHTML = days.map(([v,l])=>`<button class="chip ${selectedDay===v?'on':''}" data-day="${v}">${l}</button>`).join('');
     el.querySelectorAll('[data-day]').forEach(b=>b.addEventListener('click', ()=>{
       selectedDay = b.dataset.day;
-      renderDayTabs(); renderNowBar(); renderPlan(); renderPicks();
+      decidedId = null;
+      renderDayTabs(); renderNowBar(); renderPlan(); renderPicks(); renderDecideResult();
     }));
   }
   function renderMealTabs(){
@@ -388,8 +490,9 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     el.innerHTML = MEALS.map(m=>`<button class="chip ${selectedMeal===m?'on':''}" data-meal="${m}">${m}</button>`).join('');
     el.querySelectorAll('[data-meal]').forEach(b=>b.addEventListener('click', ()=>{
       selectedMeal = b.dataset.meal;
+      decidedId = null;
       autoSelectPeopleForMeal();
-      renderMealTabs(); renderNowBar(); renderTodayPeoplePicker(); renderPlan(); renderPicks();
+      renderMealTabs(); renderNowBar(); renderTodayPeoplePicker(); renderPlan(); renderPicks(); renderDecideResult();
     }));
   }
   function tellDidi(dish){
@@ -400,7 +503,8 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
       const url = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(dish.name + langSuffix);
       msg += ` Here's a recipe: ${url}`;
     }
-    window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+    const base = room.cookPhone ? 'https://wa.me/'+room.cookPhone+'?text=' : 'https://wa.me/?text=';
+    window.open(base + encodeURIComponent(msg), '_blank');
   }
   function renderPlan(){
     const dayWord = selectedDay==='tomorrow' ? 'tomorrow' : 'today';
@@ -425,6 +529,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
         await api(`/room/${roomCode}/dishes/${dishId}`, 'PUT', {markMadeToday:true});
         await api(`/room/${roomCode}/plan/${pid}`, 'DELETE');
         room = await api('/room/'+roomCode, 'GET');
+        toast('Marked as made ✓');
         renderPlan(); renderPicks();
       });
     });
@@ -432,9 +537,96 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
       btn.addEventListener('click', async ()=>{
         await api(`/room/${roomCode}/plan/${btn.dataset.removePlan}`, 'DELETE');
         room = await api('/room/'+roomCode, 'GET');
+        toast('Removed');
         renderPlan(); renderPicks();
       });
     });
+  }
+  // ---------- WEEKLY PLAN TAB ----------
+  function renderWeekPlan(){
+    const wrap = document.getElementById('week-plan');
+    let html = '';
+    for(let n=0; n<7; n++){
+      const date = isoForOffset(n);
+      html += `<div class="week-box" style="margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;">
+          <div class="dish-row-name">${dateLabel(n)}</div>
+          <button class="btn small secondary" data-msg-day="${date}" style="width:auto;">Message didi 📩</button>
+        </div>`;
+      MEALS.forEach(meal=>{
+        const entries = (room.plan||[]).filter(p=>p.date===date && p.meal===meal);
+        const chips = entries.map(p=>{
+          const dish = room.dishes.find(d=>d.id===p.dishId);
+          return `<span class="chip on">${dish?dietDot(dish):''}${escapeHtml(p.dishName)} <span class="x" data-del-plan="${p.id}">×</span></span>`;
+        }).join('');
+        const plannedIds = new Set(entries.map(p=>p.dishId));
+        const options = room.dishes.filter(d=>dishSuitsMeal(d, meal) && !plannedIds.has(d.id))
+          .map(d=>`<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('');
+        html += `<div class="plan-meal-row">
+          <div class="plan-meal-label">${meal}</div>
+          <div class="chip-row" style="margin-bottom:6px;">${chips || '<span class="hint">nothing yet</span>'}</div>
+          <select class="plan-add" data-add-plan="${date}:${meal}"><option value="">＋ add a dish…</option>${options}</select>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+    wrap.innerHTML = html;
+    wrap.querySelectorAll('[data-add-plan]').forEach(sel=>{
+      sel.addEventListener('change', async ()=>{
+        if(!sel.value) return;
+        const [date, meal] = sel.dataset.addPlan.split(':');
+        await api(`/room/${roomCode}/plan`, 'POST', {date, meal, dishId: sel.value});
+        room = await api('/room/'+roomCode, 'GET');
+        toast('Added to plan');
+        renderWeekPlan(); renderPlan(); renderPicks();
+      });
+    });
+    wrap.querySelectorAll('[data-del-plan]').forEach(x=>{
+      x.addEventListener('click', async ()=>{
+        await api(`/room/${roomCode}/plan/${x.dataset.delPlan}`, 'DELETE');
+        room = await api('/room/'+roomCode, 'GET');
+        toast('Removed');
+        renderWeekPlan(); renderPlan(); renderPicks();
+      });
+    });
+    wrap.querySelectorAll('[data-msg-day]').forEach(btn=>{
+      btn.addEventListener('click', ()=> messageDidiForDay(btn.dataset.msgDay));
+    });
+    renderShoppingList();
+  }
+  function messageDidiForDay(date){
+    const entries = (room.plan||[]).filter(p=>p.date===date);
+    if(entries.length===0){ toast('Nothing planned for that day'); return; }
+    const n = Math.round((new Date(date) - new Date(isoForOffset(0))) / 86400000);
+    const dayName = n===0?'today':n===1?'tomorrow':dateLabel(n);
+    let msg = `Didi 🙏 Here's the plan for ${dayName}:`;
+    MEALS.forEach(meal=>{
+      const ds = entries.filter(p=>p.meal===meal).map(p=>p.dishName);
+      if(ds.length) msg += `\n${meal[0].toUpperCase()+meal.slice(1)}: ${ds.join(', ')}`;
+    });
+    const base = room.cookPhone ? 'https://wa.me/'+room.cookPhone+'?text=' : 'https://wa.me/?text=';
+    window.open(base + encodeURIComponent(msg), '_blank');
+    toast('Opening WhatsApp 📩');
+  }
+  // ---------- SHOPPING LIST ----------
+  function renderShoppingList(){
+    const el = document.getElementById('shopping-list');
+    const dates = new Set(Array.from({length:7}, (_,n)=>isoForOffset(n)));
+    const counts = {};
+    (room.plan||[]).filter(p=>dates.has(p.date)).forEach(p=>{
+      const dish = room.dishes.find(d=>d.id===p.dishId);
+      (dish?.ingredients||[]).forEach(ing=>{ const k=(ing||'').trim().toLowerCase(); if(k) counts[k]=(counts[k]||0)+1; });
+    });
+    const items = Object.keys(counts).sort();
+    if(items.length===0){ el.innerHTML = '<div class="empty">Plan some meals above and their ingredients will appear here.</div>'; return; }
+    el.innerHTML = items.map((ing,i)=>`<div class="shop-item">
+      <input type="checkbox" id="shop-${i}" data-shop>
+      <label for="shop-${i}">${escapeHtml(ing)}</label>
+      <span class="count">${counts[ing]} dish${counts[ing]>1?'es':''}</span>
+    </div>`).join('');
+    el.querySelectorAll('[data-shop]').forEach(cb=>cb.addEventListener('change', ()=>{
+      cb.closest('.shop-item').classList.toggle('checked', cb.checked);
+    }));
   }
   function autoSelectPeopleForMeal(){
     if(!room) return;
@@ -464,9 +656,12 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     }).join('');
     el.querySelectorAll('[data-remove-person]').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
+        const p = room.people.find(x=>x.id===btn.dataset.removePerson);
+        if(!await confirmDialog(`Remove ${p?p.name:'this person'}?`, 'Remove')) return;
         await api(`/room/${roomCode}/people/${btn.dataset.removePerson}`, 'DELETE');
         room = await api('/room/'+roomCode, 'GET');
         selectedTodayPeople = selectedTodayPeople.filter(id=>room.people.some(p=>p.id===id));
+        toast('Removed');
         renderAll();
       });
     });
@@ -485,16 +680,24 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
   document.getElementById('add-person-btn').addEventListener('click', async ()=>{
     const input = document.getElementById('person-name');
     const name = input.value.trim();
-    if(!name) return;
+    if(!name){ toast('Enter a name'); return; }
     await api(`/room/${roomCode}/people`, 'POST', {name});
     input.value='';
     room = await api('/room/'+roomCode, 'GET');
+    toast(name+' added');
     renderAll();
   });
   document.getElementById('person-name').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('add-person-btn').click(); });
   document.getElementById('save-language-btn').addEventListener('click', async ()=>{
     const lang = document.getElementById('cook-language').value.trim();
     room = await api(`/room/${roomCode}`, 'PUT', {cookLanguage: lang});
+    toast('Saved ✓');
+  });
+  document.getElementById('save-phone-btn').addEventListener('click', async ()=>{
+    const phone = document.getElementById('cook-phone').value.trim();
+    room = await api(`/room/${roomCode}`, 'PUT', {cookPhone: phone});
+    document.getElementById('cook-phone').value = room.cookPhone || '';
+    toast(room.cookPhone ? 'Didi’s number saved ✓' : 'Number cleared');
   });
 
   // ---------- TODAY ----------
@@ -554,39 +757,64 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     </div>`;
   }
 
-  function renderPicks(){
-    const list = document.getElementById('picks-list');
-    if(room.dishes.length===0){ list.innerHTML = '<div class="empty">Add a few dishes in the Dishes tab to get suggestions.</div>'; return; }
-    let pool = room.dishes.filter(d=>dishSuitsMeal(d, selectedMeal));
-    if(picksDietFilter!=='all') pool = pool.filter(d=>dishDiet(d)===picksDietFilter);
-    if(pool.length===0){ list.innerHTML = `<div class="empty">No ${picksDietFilter!=='all'?picksDietFilter+' ':''}dishes tagged for ${selectedMeal} yet. Tag some in the Dishes tab.</div>`; return; }
-    const ranked = pool.map(d=>({d, score:scoreDish(d)})).sort((a,b)=>b.score-a.score).slice(0,6);
-    const ratingLabel = {great:'Cook makes it great', okay:'Cook makes it okay', unknown:"Cook doesn't know it", avoid:'Cook struggles with this'};
-    list.innerHTML = ranked.map(({d})=>{
-      const likedNames = d.likedBy.map(id=> room.people.find(p=>p.id===id)?.name).filter(Boolean);
-      const mealTags = dishMealTimes(d).map(m=>`<span class="meal-tag">${m}</span>`).join('');
-      return `<div class="pick-card ${d.cookRating}">
-        <div class="pick-top">
-          <div><div class="pick-name">${dietDot(d)}${escapeHtml(d.name)}</div>
-          <div class="pick-meta">${likedNames.length? 'Liked by '+likedNames.map(escapeHtml).join(', ') : 'No one tagged yet'}${d.lastMade? ' · last made '+daysSince(d.lastMade)+'d ago' : ''}</div>
-          ${mealTags?`<div style="margin-top:6px;">${mealTags}</div>`:''}</div>
-          <span class="badge ${d.cookRating}">${ratingLabel[d.cookRating]}</span>
-        </div>
-        ${nutritionLine(d.nutrition)}
-        <div class="pick-actions">
-          <button class="btn small ${isPlanned(d.id)?'secondary':''}" data-request="${d.id}">${isPlanned(d.id)?'✓ In plan · remind didi':'Let’s get it made'}</button>
-        </div>
-      </div>`;
-    }).join('');
-    list.querySelectorAll('[data-request]').forEach(btn=>{
+  const RATING_LABEL = {great:'Cook makes it great', okay:'Cook makes it okay', unknown:"Cook doesn't know it", avoid:'Cook struggles with this'};
+  function pickCardHtml(d, chosen){
+    const likedNames = d.likedBy.map(id=> room.people.find(p=>p.id===id)?.name).filter(Boolean);
+    const mealTags = dishMealTimes(d).map(m=>`<span class="meal-tag">${m}</span>`).join('');
+    return `<div class="pick-card ${d.cookRating}${chosen?' chosen':''}">
+      <div class="pick-top">
+        <div><div class="pick-name">${dietDot(d)}${escapeHtml(d.name)}</div>
+        <div class="pick-meta">${likedNames.length? 'Liked by '+likedNames.map(escapeHtml).join(', ') : 'No one tagged yet'}${d.lastMade? ' · last made '+daysSince(d.lastMade)+'d ago' : ''}</div>
+        ${mealTags?`<div style="margin-top:6px;">${mealTags}</div>`:''}</div>
+        <span class="badge ${d.cookRating}">${RATING_LABEL[d.cookRating]}</span>
+      </div>
+      ${nutritionLine(d.nutrition)}
+      <div class="pick-actions">
+        <button class="btn small ${isPlanned(d.id)?'secondary':''}" data-request="${d.id}">${isPlanned(d.id)?'✓ In plan · remind didi':'Let’s get it made'}</button>
+      </div>
+    </div>`;
+  }
+  function bindPickActions(container){
+    container.querySelectorAll('[data-request]').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
         const dish = room.dishes.find(x=>x.id===btn.dataset.request);
         await api(`/room/${roomCode}/plan`, 'POST', {date: isoForDay(selectedDay), meal: selectedMeal, dishId: dish.id});
         room = await api('/room/'+roomCode, 'GET');
         tellDidi(dish);
-        renderPlan(); renderPicks();
+        toast('Added to plan · messaging didi 📩');
+        renderPlan(); renderPicks(); renderDecideResult();
       });
     });
+  }
+  function rankedPool(limit){
+    let pool = room.dishes.filter(d=>dishSuitsMeal(d, selectedMeal));
+    if(picksDietFilter!=='all') pool = pool.filter(d=>dishDiet(d)===picksDietFilter);
+    const ranked = pool.map(d=>({d, score:scoreDish(d)})).sort((a,b)=>b.score-a.score);
+    return limit ? ranked.slice(0, limit) : ranked;
+  }
+  function renderPicks(){
+    const list = document.getElementById('picks-list');
+    if(room.dishes.length===0){ list.innerHTML = '<div class="empty">Add a few dishes in the Dishes tab to get suggestions.</div>'; return; }
+    const ranked = rankedPool(6);
+    if(ranked.length===0){ list.innerHTML = `<div class="empty">No ${picksDietFilter!=='all'?picksDietFilter+' ':''}dishes tagged for ${selectedMeal} yet. Tag some in the Dishes tab.</div>`; return; }
+    list.innerHTML = ranked.map(({d})=>pickCardHtml(d, false)).join('');
+    bindPickActions(list);
+  }
+  // ---- "Decide for me" ----
+  let decidedId = null;
+  function renderDecideResult(){
+    const el = document.getElementById('decide-result');
+    const d = decidedId && room.dishes.find(x=>x.id===decidedId);
+    if(!d){ el.innerHTML=''; return; }
+    el.innerHTML = `<div class="decide-label">For ${selectedDay==='tomorrow'?'tomorrow':'today'}’s ${selectedMeal}, let’s make:</div>` + pickCardHtml(d, true);
+    bindPickActions(el);
+  }
+  function decideForMe(){
+    const ranked = rankedPool(3);
+    if(ranked.length===0){ toast('Add or tag some dishes for '+selectedMeal+' first'); decidedId=null; renderDecideResult(); return; }
+    decidedId = ranked[Math.floor(Math.random()*ranked.length)].d.id;
+    renderDecideResult();
+    document.getElementById('decide-result').scrollIntoView({behavior:'smooth', block:'center'});
   }
 
   // ---------- DISHES ----------
@@ -692,9 +920,42 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     document.getElementById('dish-name').scrollIntoView({behavior:'smooth', block:'center'});
     document.getElementById('dish-name').focus();
   }
+  function startEditDish(d){
+    editingDishId = d.id;
+    document.getElementById('dish-name').value = d.name;
+    document.getElementById('dish-category').value = d.category || 'other';
+    document.getElementById('dish-diet').value = dishDiet(d);
+    document.getElementById('dish-cook-rating').value = d.cookRating || 'unknown';
+    dishFormMealTimes = [...dishMealTimes(d)];
+    dishFormLikedBy = [...(d.likedBy||[])];
+    dishFormIngredients = [...(d.ingredients||[])];
+    const n = d.nutrition || {};
+    document.getElementById('dish-kcal').value = n.kcal ?? '';
+    document.getElementById('dish-protein').value = n.protein ?? '';
+    document.getElementById('dish-carbs').value = n.carbs ?? '';
+    document.getElementById('dish-fat').value = n.fat ?? '';
+    renderDishMealPicker(); renderDishPeoplePicker(); renderDishIngredientsPicker();
+    document.getElementById('dish-form-title').textContent = 'Edit dish';
+    document.getElementById('save-dish-btn').textContent = 'Save changes';
+    document.getElementById('cancel-edit-btn').style.display = '';
+    document.getElementById('dish-name').scrollIntoView({behavior:'smooth', block:'center'});
+  }
+  function resetDishForm(){
+    editingDishId = null;
+    document.getElementById('dish-name').value = '';
+    document.getElementById('dish-diet').value = 'veg';
+    document.getElementById('dish-cook-rating').value = 'unknown';
+    ['dish-kcal','dish-protein','dish-carbs','dish-fat'].forEach(id=>document.getElementById(id).value='');
+    dishFormLikedBy = []; dishFormIngredients = []; dishFormMealTimes = [];
+    document.getElementById('dish-form-title').textContent = 'Add a dish';
+    document.getElementById('save-dish-btn').textContent = 'Add dish';
+    document.getElementById('cancel-edit-btn').style.display = 'none';
+    renderDishMealPicker(); renderDishPeoplePicker(); renderDishIngredientsPicker();
+  }
+  document.getElementById('cancel-edit-btn').addEventListener('click', resetDishForm);
   document.getElementById('save-dish-btn').addEventListener('click', async ()=>{
     const name = document.getElementById('dish-name').value.trim();
-    if(!name) return;
+    if(!name){ toast('Give the dish a name'); return; }
     const category = document.getElementById('dish-category').value;
     const diet = document.getElementById('dish-diet').value;
     const cookRating = document.getElementById('dish-cook-rating').value;
@@ -704,18 +965,21 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
       carbs: num('dish-carbs'), fat: num('dish-fat')
     };
     const hasNutrition = Object.values(nutrition).some(v=>v!==undefined);
-    await api(`/room/${roomCode}/dishes`, 'POST', {
+    const payload = {
       name, category, diet, cookRating,
       mealTimes: [...dishFormMealTimes],
       likedBy: [...dishFormLikedBy], ingredients: [...dishFormIngredients],
       nutrition: hasNutrition ? nutrition : null
-    });
-    document.getElementById('dish-name').value='';
-    document.getElementById('dish-diet').value='veg';
-    ['dish-kcal','dish-protein','dish-carbs','dish-fat'].forEach(id=>document.getElementById(id).value='');
-    dishFormLikedBy = []; dishFormIngredients = []; dishFormMealTimes = [];
+    };
+    if(editingDishId){
+      await api(`/room/${roomCode}/dishes/${editingDishId}`, 'PUT', payload);
+      toast('Dish updated ✓');
+    } else {
+      await api(`/room/${roomCode}/dishes`, 'POST', payload);
+      toast('Dish added ✓');
+    }
+    resetDishForm();
     room = await api('/room/'+roomCode, 'GET');
-    renderDishPeoplePicker(); renderDishIngredientsPicker(); renderDishMealPicker();
     renderCategoryFilter(); renderDishDietFilter(); renderDishList(); renderDishSuggestions(); renderPicks();
   });
 
@@ -751,7 +1015,10 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
         <div class="dish-edit"><span class="dish-edit-label">Cook makes it</span>
           <select class="rate-select" data-rate-dish="${d.id}">${rateOpts}</select>
         </div></div>
-        <button class="icon-btn" data-delete-dish="${d.id}">Delete</button>
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">
+          <button class="icon-btn" data-edit-dish="${d.id}">Edit</button>
+          <button class="icon-btn" data-delete-dish="${d.id}">Delete</button>
+        </div>
       </div>`;
     }).join('');
     el.querySelectorAll('[data-rate-dish]').forEach(sel=>{
@@ -759,13 +1026,23 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
         await api(`/room/${roomCode}/dishes/${sel.dataset.rateDish}`, 'PUT', {cookRating: sel.value});
         room = await api('/room/'+roomCode, 'GET');
         renderDishList(); renderPicks();
+        toast('Updated ✓');
+      });
+    });
+    el.querySelectorAll('[data-edit-dish]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const d = room.dishes.find(x=>x.id===btn.dataset.editDish);
+        if(d) startEditDish(d);
       });
     });
     el.querySelectorAll('[data-delete-dish]').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
+        const d = room.dishes.find(x=>x.id===btn.dataset.deleteDish);
+        if(!await confirmDialog(`Delete “${d?d.name:'this dish'}”?`)) return;
         await api(`/room/${roomCode}/dishes/${btn.dataset.deleteDish}`, 'DELETE');
         room = await api('/room/'+roomCode, 'GET');
-        renderCategoryFilter(); renderDishList(); renderPicks();
+        toast('Deleted');
+        renderCategoryFilter(); renderDishDietFilter(); renderDishList(); renderDishSuggestions(); renderPicks();
       });
     });
   }
@@ -792,17 +1069,22 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
   }
 
   function renderAll(){
+    decidedId = null;
     renderNowBar(); renderDayTabs(); renderMealTabs(); renderPicksDietFilter();
-    renderPlan();
+    renderPlan(); renderDecideResult();
     renderTodayPeoplePicker(); renderTodayIngredients(); renderPicks();
     renderDishPeoplePicker(); renderDishIngredientsPicker(); renderDishMealPicker();
     renderCategoryFilter(); renderDishDietFilter(); renderDishList(); renderDishSuggestions();
     renderPeopleList();
     document.getElementById('cook-language').value = room.cookLanguage || '';
+    document.getElementById('cook-phone').value = room.cookPhone || '';
   }
 
   // keep the clock / "next meal" fresh
   setInterval(()=>{ if(room) renderNowBar(); }, 30000);
+
+  // register the service worker so the app is installable + works offline
+  if('serviceWorker' in navigator){ navigator.serviceWorker.register('/sw.js').catch(()=>{}); }
 
   // auto-rejoin if we have a saved room code
   if(roomCode){ tryEnterRoom(roomCode); }
