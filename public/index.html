@@ -169,6 +169,14 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
 .shop-item input{width:18px;height:18px;flex:none;}
 .shop-item.checked label{text-decoration:line-through;color:var(--ink-soft);}
 .shop-item .count{margin-left:auto;font-size:11.5px;color:var(--ink-soft);}
+/* this-week per-day breakdown */
+.week-day{margin-bottom:16px;}
+.week-day:last-child{margin-bottom:0;}
+.week-day-head{display:flex;justify-content:space-between;align-items:baseline;font-family:'Fraunces',serif;font-weight:600;font-size:15px;border-bottom:1px solid var(--card-line);padding-bottom:6px;margin-bottom:8px;}
+.week-day-kcal{font-family:'Inter',sans-serif;font-weight:600;font-size:12px;color:var(--ink-soft);}
+.week-row{display:flex;align-items:center;gap:6px;font-size:13.5px;padding:4px 0;}
+.week-meal{text-transform:capitalize;font-size:10.5px;font-weight:600;color:var(--gold);min-width:62px;}
+.week-kcal{margin-left:auto;font-size:11.5px;color:var(--ink-soft);white-space:nowrap;}
 </style>
 </head>
 <body>
@@ -340,8 +348,8 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
   </div>
 
   <div class="panel" id="panel-week">
-    <h2 class="section-title">This week's intake (rough total)</h2>
-    <p class="hint">Adds up nutrition from everything marked "made today" in the last 7 days. Approximate — for awareness, not tracking.</p>
+    <h2 class="section-title">This week</h2>
+    <p class="hint">What got made each day in the last 7 days, with rough nutrition. Approximate — for awareness, not tracking.</p>
     <div class="week-box" id="week-summary"></div>
   </div>
 </div>
@@ -1278,24 +1286,47 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
   }
 
   // ---------- WEEK SUMMARY ----------
+  function weekDayLabel(date){
+    const n = Math.round((new Date(date) - new Date(isoForOffset(0))) / 86400000);
+    const d = new Date(date);
+    const days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const rel = n===0?'Today':n===-1?'Yesterday':days[d.getDay()];
+    return `${rel} · ${d.getDate()} ${months[d.getMonth()]}`;
+  }
   function renderWeek(){
     const el = document.getElementById('week-summary');
-    const recentlyMade = room.dishes.filter(d=> d.lastMade && daysSince(d.lastMade) <= 7);
-    if(recentlyMade.length===0){ el.innerHTML = '<div class="empty">Nothing marked "made today" in the last 7 days yet.</div>'; return; }
-    const totals = recentlyMade.reduce((acc,d)=>{
-      const n = d.nutrition || {};
-      acc.kcal += n.kcal||0; acc.protein += n.protein||0; acc.carbs += n.carbs||0; acc.fat += n.fat||0;
-      return acc;
-    }, {kcal:0, protein:0, carbs:0, fat:0});
+    const window7 = new Set(Array.from({length:7}, (_,n)=>isoForOffset(-n))); // today .. 6 days ago
+    const made = (room.plan||[]).filter(p=>p.status==='made' && window7.has(p.date));
+    if(made.length===0){ el.innerHTML = '<div class="empty">Nothing marked “made” in the last 7 days yet. Mark meals made on the Today tab and they’ll show up here, by day.</div>'; return; }
+    const byDate = {};
+    made.forEach(p=>{ (byDate[p.date]=byDate[p.date]||[]).push(p); });
+    const mealOrder = {breakfast:0, lunch:1, dinner:2};
+    const total = {kcal:0, protein:0, carbs:0, fat:0};
+    let daysHtml = '';
+    Object.keys(byDate).sort().reverse().forEach(date=>{
+      const items = byDate[date].sort((a,b)=>(mealOrder[a.meal]??9)-(mealOrder[b.meal]??9));
+      const dayTot = {kcal:0, protein:0, carbs:0, fat:0};
+      const rows = items.map(p=>{
+        const dish = room.dishes.find(d=>d.id===p.dishId);
+        const n = (dish && dish.nutrition) || {};
+        ['kcal','protein','carbs','fat'].forEach(k=>{ dayTot[k]+=n[k]||0; total[k]+=n[k]||0; });
+        return `<div class="week-row"><span class="week-meal">${p.meal}</span> ${dish?dietDot(dish):''}${escapeHtml(p.dishName)}${n.kcal?`<span class="week-kcal">${n.kcal} kcal</span>`:''}</div>`;
+      }).join('');
+      daysHtml += `<div class="week-day">
+        <div class="week-day-head">${weekDayLabel(date)}<span class="week-day-kcal">${Math.round(dayTot.kcal)} kcal</span></div>
+        ${rows}
+      </div>`;
+    });
     el.innerHTML = `
       <div class="nutrition-row" style="font-size:13px;">
-        <span><b>${Math.round(totals.kcal)}</b> kcal</span>
-        <span><b>${Math.round(totals.protein)}g</b> protein</span>
-        <span><b>${Math.round(totals.carbs)}g</b> carbs</span>
-        <span><b>${Math.round(totals.fat)}g</b> fat</span>
+        <span><b>${Math.round(total.kcal)}</b> kcal</span>
+        <span><b>${Math.round(total.protein)}g</b> protein</span>
+        <span><b>${Math.round(total.carbs)}g</b> carbs</span>
+        <span><b>${Math.round(total.fat)}g</b> fat</span>
       </div>
-      <div class="hint" style="margin-top:10px;">From: ${recentlyMade.map(d=>escapeHtml(d.name)).join(', ')}</div>
-    `;
+      <div class="hint" style="margin:8px 0 16px;">Last 7 days total · tap a meal “Made” on Today to log it here</div>
+      ${daysHtml}`;
   }
 
   function renderAll(){
