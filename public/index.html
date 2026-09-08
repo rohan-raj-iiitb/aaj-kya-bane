@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Aaj Kya Bane</title>
+<title>Aaj Kya Banwaye</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="Aaj Kya Bane" />
+<meta name="apple-mobile-web-app-title" content="Aaj Kya Banwaye" />
 <link rel="manifest" href="/manifest.webmanifest" />
 <meta name="theme-color" content="#C08415" />
 <link rel="icon" href="/icon.svg" type="image/svg+xml" />
@@ -28,9 +28,27 @@ html,body{margin:0;padding:0;}
 body{
   background:var(--bg); color:var(--ink);
   font-family:'Inter',system-ui,sans-serif; line-height:1.5;
-  min-height:100vh; padding-bottom:70px;
+  min-height:100vh; padding-bottom:calc(76px + env(safe-area-inset-bottom));
 }
-.wrap{max-width:640px;margin:0 auto;padding:24px 18px 0;}
+.wrap{max-width:640px;margin:0 auto;padding:18px 18px 0;}
+
+/* branded top header */
+#app-header{position:sticky;top:0;z-index:40;background:var(--ink);border-bottom:2px solid var(--gold);}
+.header-inner{max-width:640px;margin:0 auto;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;}
+.brand{display:flex;align-items:center;gap:9px;font-family:'Fraunces',serif;font-weight:600;font-size:20px;letter-spacing:-0.01em;color:var(--bg);}
+.brand-logo{font-size:21px;line-height:1;}
+
+/* bottom tab bar */
+#bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:40;display:flex;background:var(--card);border-top:1px solid var(--card-line);padding-bottom:env(safe-area-inset-bottom);}
+.navbtn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;padding:8px 2px 7px;font-family:'Inter',sans-serif;font-size:10.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;position:relative;}
+.navbtn .navicon{font-size:19px;line-height:1;filter:saturate(.4) opacity(.7);transition:filter .15s;}
+.navbtn.active{color:var(--gold);}
+.navbtn.active .navicon{filter:none;}
+.navbtn.active::before{content:'';position:absolute;top:0;left:22%;right:22%;height:2px;background:var(--gold);border-radius:0 0 3px 3px;}
+
+/* slim time / next-meal line + gate logo */
+.now-line{font-size:12.5px;color:var(--ink-soft);margin-bottom:14px;}
+.gate-logo{font-size:52px;line-height:1;margin-bottom:6px;}
 h1.wordmark{font-family:'Fraunces',serif;font-weight:600;font-size:32px;margin:0 0 4px;letter-spacing:-0.01em;}
 p.tagline{margin:0 0 22px;color:var(--ink-soft);font-size:14.5px;}
 
@@ -137,7 +155,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
 .meal-tag{display:inline-block;font-size:10.5px;padding:1px 8px;border-radius:100px;background:var(--gold-soft);color:#7A5610;text-transform:capitalize;margin:2px 4px 0 0;}
 
 /* toast + loading bar */
-#toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--white);padding:10px 18px;border-radius:100px;font-size:13.5px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:50;box-shadow:0 6px 20px rgba(0,0,0,.18);max-width:80%;text-align:center;}
+#toast{position:fixed;left:50%;bottom:calc(88px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--white);padding:10px 18px;border-radius:100px;font-size:13.5px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:50;box-shadow:0 6px 20px rgba(0,0,0,.18);max-width:80%;text-align:center;}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 #loadbar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--gold);z-index:60;opacity:0;transition:width .2s ease,opacity .3s ease;}
 #loadbar.on{opacity:1;}
@@ -147,7 +165,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
 #confirm-msg{font-size:15px;margin-bottom:18px;color:var(--ink);}
 #confirm-actions{display:flex;gap:10px;}
 #confirm-actions .btn{flex:1;}
-#ios-install-hint{position:fixed;left:12px;right:12px;bottom:12px;background:var(--ink);color:var(--white);padding:12px 40px 12px 16px;border-radius:12px;font-size:13.5px;line-height:1.45;box-shadow:0 8px 28px rgba(0,0,0,.28);z-index:65;display:none;}
+#ios-install-hint{position:fixed;left:12px;right:12px;bottom:calc(80px + env(safe-area-inset-bottom));background:var(--ink);color:var(--white);padding:12px 40px 12px 16px;border-radius:12px;font-size:13.5px;line-height:1.45;box-shadow:0 8px 28px rgba(0,0,0,.28);z-index:65;display:none;}
 #ios-install-hint.show{display:block;}
 #ios-install-hint b{color:var(--gold-soft);}
 #ios-hint-x{position:absolute;top:6px;right:10px;cursor:pointer;font-size:16px;opacity:.85;padding:4px;}
@@ -195,9 +213,16 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
   </div>
 </div>
 
+<header id="app-header" style="display:none;">
+  <div class="header-inner">
+    <span class="brand"><span class="brand-logo">🍲</span>Aaj Kya Banwaye</span>
+  </div>
+</header>
+
 <div id="gate">
-  <h1>Aaj Kya Bane</h1>
-  <p>What your household likes, crossed with what your cook makes well.</p>
+  <div class="gate-logo">🍲</div>
+  <h1>Aaj Kya Banwaye</h1>
+  <p>Decide today’s meal together — then send it to your cook. No more “aaj kya banaayein?” every morning.</p>
   <div class="gate-card">
     <label>Have a room code?</label>
     <input type="text" id="join-code" placeholder="e.g. PB7K2Q" maxlength="6" />
@@ -216,26 +241,8 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     <button id="leave-btn">Switch room</button>
   </div>
 
-  <div class="tabs">
-    <button class="tab active" data-tab="today">Today</button>
-    <button class="tab" data-tab="plan">Plan</button>
-    <button class="tab" data-tab="dishes">Dishes</button>
-    <button class="tab" data-tab="people">People</button>
-    <button class="tab" data-tab="week">This week</button>
-  </div>
-
   <div class="panel active" id="panel-today">
-    <div class="now-bar" id="now-bar">
-      <div>
-        <div class="now-when" id="now-day"></div>
-        <div class="now-time" id="now-time"></div>
-      </div>
-      <div class="now-meal">
-        <small>Planning for</small>
-        <b id="now-meal"></b>
-        <div class="now-when" id="now-meal-when"></div>
-      </div>
-    </div>
+    <div class="now-line" id="now-line"></div>
     <div class="meal-tabs" id="day-tabs" style="margin-bottom:8px;"></div>
     <div class="meal-tabs" id="meal-tabs"></div>
 
@@ -356,6 +363,14 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
   </div>
 </div>
 
+<nav id="bottom-nav" style="display:none;">
+  <button class="navbtn active" data-tab="today"><span class="navicon">🍽️</span>Today</button>
+  <button class="navbtn" data-tab="plan"><span class="navicon">🗓️</span>Plan</button>
+  <button class="navbtn" data-tab="dishes"><span class="navicon">🍲</span>Dishes</button>
+  <button class="navbtn" data-tab="people"><span class="navicon">👥</span>People</button>
+  <button class="navbtn" data-tab="week"><span class="navicon">📊</span>Week</button>
+</nav>
+
 <script>
 (function(){
   const MEALS = ['breakfast', 'lunch', 'dinner'];
@@ -466,6 +481,8 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
       myId = localStorage.getItem('aajkyabane-me-'+roomCode) || '';
       document.getElementById('gate').style.display='none';
       document.getElementById('app').style.display='block';
+      document.getElementById('app-header').style.display='block';
+      document.getElementById('bottom-nav').style.display='flex';
       document.getElementById('room-code-display').textContent = roomCode;
       autoSelectPeopleForMeal();
       renderAll();
@@ -489,6 +506,8 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     localStorage.setItem('aajkyabane-me-'+roomCode, myId);
     document.getElementById('gate').style.display='none';
     document.getElementById('app').style.display='block';
+    document.getElementById('app-header').style.display='block';
+    document.getElementById('bottom-nav').style.display='flex';
     document.getElementById('room-code-display').textContent = roomCode;
     autoSelectPeopleForMeal();
     renderAll();
@@ -541,12 +560,13 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     if(dish) proposeDish(dish);   // proposeDish clears the search + re-renders
   }
 
-  document.querySelectorAll('.tab').forEach(tab=>{
+  document.querySelectorAll('.navbtn').forEach(tab=>{
     tab.addEventListener('click', ()=>{
-      document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+      document.querySelectorAll('.navbtn').forEach(t=>t.classList.remove('active'));
       document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
       tab.classList.add('active');
       document.getElementById('panel-'+tab.dataset.tab).classList.add('active');
+      window.scrollTo(0, 0);
       if(tab.dataset.tab === 'week') renderWeek();
       if(tab.dataset.tab === 'plan') renderWeekPlan();
     });
@@ -554,17 +574,11 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
 
   // ---------- NOW BAR + MEAL PLANNER ----------
   function renderNowBar(){
-    const { now } = mealPlan();
-    const days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-    const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    document.getElementById('now-day').textContent = days[now.getDay()]+', '+now.getDate()+' '+months[now.getMonth()];
+    const { now, meal, when } = mealPlan();
+    const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
     let hr=now.getHours(); const min=String(now.getMinutes()).padStart(2,'0'); const ap=hr<12?'AM':'PM'; let h12=hr%12; if(h12===0) h12=12;
-    document.getElementById('now-time').textContent = h12+':'+min+' '+ap;
-    document.getElementById('now-meal').textContent = selectedMeal;
-    const p = mealPlan();
-    let whenTxt = selectedDay==='tomorrow' ? 'tomorrow' : 'today';
-    if(selectedDay===p.when && selectedMeal===p.meal) whenTxt = 'the next meal · '+p.when;
-    document.getElementById('now-meal-when').textContent = whenTxt;
+    const nextStr = when==='tomorrow' ? `${meal} tomorrow` : `${meal} next`;
+    document.getElementById('now-line').textContent = `🕐 ${days[now.getDay()]} ${h12}:${min} ${ap} · ${nextStr}`;
   }
   function renderDayTabs(){
     const el = document.getElementById('day-tabs');
