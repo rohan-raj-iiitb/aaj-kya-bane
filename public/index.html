@@ -1297,7 +1297,13 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
   function renderWeek(){
     const el = document.getElementById('week-summary');
     const window7 = new Set(Array.from({length:7}, (_,n)=>isoForOffset(-n))); // today .. 6 days ago
-    const made = (room.plan||[]).filter(p=>p.status==='made' && window7.has(p.date));
+    const madeEntries = (room.plan||[]).filter(p=>p.status==='made' && window7.has(p.date));
+    // legacy: dishes marked made before dated entries existed — show them by their lastMade date
+    const covered = new Set(madeEntries.map(p=>p.date+'|'+p.dishId));
+    const legacy = room.dishes
+      .filter(d=> d.lastMade && window7.has(d.lastMade) && !covered.has(d.lastMade+'|'+d.id))
+      .map(d=>({date:d.lastMade, meal:'', dishId:d.id, dishName:d.name}));
+    const made = [...madeEntries, ...legacy];
     if(made.length===0){ el.innerHTML = '<div class="empty">Nothing marked “made” in the last 7 days yet. Mark meals made on the Today tab and they’ll show up here, by day.</div>'; return; }
     const byDate = {};
     made.forEach(p=>{ (byDate[p.date]=byDate[p.date]||[]).push(p); });
@@ -1311,7 +1317,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
         const dish = room.dishes.find(d=>d.id===p.dishId);
         const n = (dish && dish.nutrition) || {};
         ['kcal','protein','carbs','fat'].forEach(k=>{ dayTot[k]+=n[k]||0; total[k]+=n[k]||0; });
-        return `<div class="week-row"><span class="week-meal">${p.meal}</span> ${dish?dietDot(dish):''}${escapeHtml(p.dishName)}${n.kcal?`<span class="week-kcal">${n.kcal} kcal</span>`:''}</div>`;
+        return `<div class="week-row"><span class="week-meal">${p.meal||'made'}</span> ${dish?dietDot(dish):''}${escapeHtml(p.dishName)}${n.kcal?`<span class="week-kcal">${n.kcal} kcal</span>`:''}</div>`;
       }).join('');
       daysHtml += `<div class="week-day">
         <div class="week-day-head">${weekDayLabel(date)}<span class="week-day-kcal">${Math.round(dayTot.kcal)} kcal</span></div>
