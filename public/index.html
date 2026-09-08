@@ -127,6 +127,19 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
 .meal-tabs{display:flex;gap:8px;margin-bottom:16px;}
 .meal-tabs .chip{flex:1;text-align:center;text-transform:capitalize;}
 
+/* Today's meals at-a-glance strip */
+#day-glance{background:var(--card);border:1px solid var(--card-line);border-radius:10px;padding:10px 12px;margin-bottom:18px;}
+.glance-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);margin-bottom:4px;}
+.glance-row{display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;text-align:left;padding:6px 4px;cursor:pointer;border-radius:6px;font-size:13.5px;color:var(--ink);font-family:'Inter',sans-serif;}
+.glance-row:hover{background:var(--bg);}
+.glance-icon{width:16px;text-align:center;font-weight:700;color:var(--ink-soft);flex:none;}
+.glance-row.made .glance-icon{color:var(--green);}
+.glance-row.agreed .glance-icon{color:var(--gold);}
+.glance-meal{text-transform:capitalize;font-weight:600;min-width:72px;flex:none;}
+.glance-dishes{color:var(--ink-soft);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.glance-empty{opacity:.65;}
+.next-badge{font-size:9.5px;background:var(--gold);color:#fff;padding:1px 7px;border-radius:100px;text-transform:uppercase;letter-spacing:.04em;margin-left:6px;vertical-align:middle;}
+
 /* veg / non-veg indicator (classic green/red mark) */
 .diet-dot{display:inline-block;width:13px;height:13px;border-radius:3px;border:1.5px solid var(--green);position:relative;vertical-align:middle;margin-right:6px;flex:none;}
 .diet-dot::after{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:6px;height:6px;border-radius:50%;background:var(--green);}
@@ -236,6 +249,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     </div>
     <div class="meal-tabs" id="day-tabs" style="margin-bottom:8px;"></div>
     <div class="meal-tabs" id="meal-tabs"></div>
+    <div id="day-glance"></div>
 
     <h2 class="section-title" id="today-people-title">Who's eating?</h2>
     <div class="chip-row" id="today-people"></div>
@@ -596,7 +610,42 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     const base = room.cookPhone ? 'https://wa.me/'+room.cookPhone+'?text=' : 'https://wa.me/?text=';
     window.open(base + encodeURIComponent(msg), '_blank');
   }
+  function renderDayGlance(){
+    const el = document.getElementById('day-glance');
+    const date = isoForDay(selectedDay);
+    const planForDay = (room.plan||[]).filter(p=>p.date===date);
+    const covered = new Set(planForDay.map(p=>p.dishId));
+    // legacy made dishes (marked before dated entries) — slot into a meal by their tags
+    const legacy = room.dishes.filter(d=>d.lastMade===date && !covered.has(d.id)).map(d=>{
+      const mt = dishMealTimes(d);
+      const meal = ['breakfast','lunch','dinner'].find(m=>mt.includes(m)) || 'dinner';
+      return {meal, dishName:d.name, dishId:d.id, status:'made'};
+    });
+    const all = [...planForDay, ...legacy];
+    const np = mealPlan();
+    const nextDate = np.when==='tomorrow' ? isoForOffset(1) : isoForOffset(0);
+    const rows = MEALS.map(meal=>{
+      const items = all.filter(p=>p.meal===meal);
+      let icon='·', txt='<span class="glance-empty">nothing yet</span>', cls='';
+      if(items.length){
+        const anyMade = items.some(p=>(p.status||'agreed')==='made');
+        const anyAgreed = items.some(p=>(p.status||'agreed')==='agreed');
+        icon = anyMade?'✓':anyAgreed?'●':'○';
+        cls = anyMade?'made':anyAgreed?'agreed':'proposed';
+        txt = items.map(p=>escapeHtml(p.dishName)).join(', ');
+      }
+      const nextTag = (date===nextDate && meal===np.meal) ? '<span class="next-badge">next up</span>' : '';
+      return `<button class="glance-row ${cls}" data-glance-meal="${meal}"><span class="glance-icon">${icon}</span><span class="glance-meal">${meal}${nextTag}</span><span class="glance-dishes">${txt}</span></button>`;
+    }).join('');
+    el.innerHTML = `<div class="glance-title">${selectedDay==='tomorrow'?'Tomorrow':'Today'}’s meals · tap to open</div>${rows}`;
+    el.querySelectorAll('[data-glance-meal]').forEach(b=>b.addEventListener('click', ()=>{
+      selectedMeal = b.dataset.glanceMeal; decidedId = null; replacingPlanId = null;
+      autoSelectPeopleForMeal();
+      renderMealTabs(); renderNowBar(); renderTodayPeoplePicker(); renderPlan(); renderPicks(); renderDecideResult();
+    }));
+  }
   function renderPlan(){
+    renderDayGlance();
     const dayWord = selectedDay==='tomorrow' ? 'tomorrow' : 'today';
     document.getElementById('plan-title').textContent = `Deciding for ${dayWord}’s ${selectedMeal}`;
     const box = document.getElementById('plan-box');
@@ -679,6 +728,8 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
   // ---------- WEEKLY PLAN TAB ----------
   function renderWeekPlan(){
     const wrap = document.getElementById('week-plan');
+    const np = mealPlan();
+    const nextDate = np.when==='tomorrow' ? isoForOffset(1) : isoForOffset(0);
     let html = '';
     for(let n=0; n<7; n++){
       const date = isoForOffset(n);
@@ -697,8 +748,9 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
         const plannedIds = new Set(entries.map(p=>p.dishId));
         const options = room.dishes.filter(d=>dishSuitsMeal(d, meal) && !plannedIds.has(d.id))
           .map(d=>`<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('');
+        const nextTag = (date===nextDate && meal===np.meal) ? '<span class="next-badge">next up</span>' : '';
         html += `<div class="plan-meal-row">
-          <div class="plan-meal-label">${meal}</div>
+          <div class="plan-meal-label">${meal}${nextTag}</div>
           <div class="chip-row" style="margin-bottom:6px;">${chips || '<span class="hint">nothing yet</span>'}</div>
           <select class="plan-add" data-add-plan="${date}:${meal}"><option value="">＋ add a dish…</option>${options}</select>
         </div>`;
