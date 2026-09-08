@@ -600,18 +600,25 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     }
     box.innerHTML = entries.map(p=>{
       const dish = room.dishes.find(d=>d.id===p.dishId);
-      const agreed = (p.status||'agreed')==='agreed';
+      const status = p.status || 'agreed';
       const proposer = room.people.find(x=>x.id===p.proposedBy);
-      const statusChip = agreed ? '<span class="badge great">Agreed</span>' : '<span class="badge">Waiting to agree</span>';
-      const meta = agreed
-        ? 'Everyone’s in — ready for the cook'
-        : ('Proposed'+(proposer?' by '+escapeHtml(proposer.name):'')+' · waiting for the household to agree');
-      const actions = agreed
-        ? `<button class="btn small" data-cook-plan="${p.id}:${p.dishId}">Send to cook 📩</button>
-           <button class="btn small secondary" data-made-plan="${p.id}:${p.dishId}">✓ Made</button>`
-        : `<button class="btn small" data-agree-plan="${p.id}">Agree ✅</button>
+      let statusChip, meta, actions;
+      if(status==='made'){
+        statusChip = '<span class="badge great">Made ✓</span>';
+        meta = 'Cooked — added to “This week”';
+        actions = `<button class="btn small secondary" data-undo-made="${p.id}">Undo</button>`;
+      } else if(status==='agreed'){
+        statusChip = '<span class="badge great">Agreed</span>';
+        meta = 'Everyone’s in — ready for the cook';
+        actions = `<button class="btn small" data-cook-plan="${p.id}:${p.dishId}">Send to cook 📩</button>
+           <button class="btn small secondary" data-made-plan="${p.id}:${p.dishId}">✓ Made</button>`;
+      } else {
+        statusChip = '<span class="badge">Waiting to agree</span>';
+        meta = 'Proposed'+(proposer?' by '+escapeHtml(proposer.name):'')+' · waiting for the household to agree';
+        actions = `<button class="btn small" data-agree-plan="${p.id}">Agree ✅</button>
            <button class="btn small secondary" data-nudge-plan="${p.dishId}">Nudge 📩</button>
            <button class="btn small secondary" data-swap-plan="${p.id}">Suggest instead</button>`;
+      }
       return `<div class="dish-row" style="align-items:flex-start;">
         <div>
           <div class="dish-row-name">${dish?dietDot(dish):''}${escapeHtml(p.dishName)} ${statusChip}</div>
@@ -643,9 +650,15 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     box.querySelectorAll('[data-made-plan]').forEach(btn=>btn.addEventListener('click', async ()=>{
       const [pid, dishId] = btn.dataset.madePlan.split(':');
       await api(`/room/${roomCode}/dishes/${dishId}`, 'PUT', {markMadeToday:true});
-      await api(`/room/${roomCode}/plan/${pid}`, 'DELETE');
+      await api(`/room/${roomCode}/plan/${pid}`, 'PUT', {status:'made'});
       room = await api('/room/'+roomCode, 'GET');
       toast('Marked as made ✓');
+      renderPlan(); renderPicks();
+    }));
+    box.querySelectorAll('[data-undo-made]').forEach(btn=>btn.addEventListener('click', async ()=>{
+      await api(`/room/${roomCode}/plan/${btn.dataset.undoMade}`, 'PUT', {status:'agreed'});
+      room = await api('/room/'+roomCode, 'GET');
+      toast('Moved back to agreed');
       renderPlan(); renderPicks();
     }));
     box.querySelectorAll('[data-remove-plan]').forEach(btn=>btn.addEventListener('click', async ()=>{
@@ -670,7 +683,8 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
         const entries = (room.plan||[]).filter(p=>p.date===date && p.meal===meal);
         const chips = entries.map(p=>{
           const dish = room.dishes.find(d=>d.id===p.dishId);
-          return `<span class="chip on">${dish?dietDot(dish):''}${escapeHtml(p.dishName)} <span class="x" data-del-plan="${p.id}">×</span></span>`;
+          const made = p.status==='made' ? '✓ ' : '';
+          return `<span class="chip on">${made}${dish?dietDot(dish):''}${escapeHtml(p.dishName)} <span class="x" data-del-plan="${p.id}">×</span></span>`;
         }).join('');
         const plannedIds = new Set(entries.map(p=>p.dishId));
         const options = room.dishes.filter(d=>dishSuitsMeal(d, meal) && !plannedIds.has(d.id))
@@ -727,7 +741,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     const el = document.getElementById('shopping-list');
     const dates = new Set(Array.from({length:7}, (_,n)=>isoForOffset(n)));
     const counts = {};
-    (room.plan||[]).filter(p=>dates.has(p.date)).forEach(p=>{
+    (room.plan||[]).filter(p=>dates.has(p.date) && p.status!=='made').forEach(p=>{
       const dish = room.dishes.find(d=>d.id===p.dishId);
       (dish?.ingredients||[]).forEach(ing=>{ const k=(ing||'').trim().toLowerCase(); if(k) counts[k]=(counts[k]||0)+1; });
     });

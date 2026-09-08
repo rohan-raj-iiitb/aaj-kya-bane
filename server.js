@@ -286,7 +286,7 @@ const server = http.createServer(async (req, res) => {
           const entry = room.plan.find(p => p.id === parts[4]);
           if (!entry) return sendJSON(res, 404, { error: 'Plan item not found' });
           const body = await readBody(req);
-          if (body.status === 'proposed' || body.status === 'agreed') entry.status = body.status;
+          if (['proposed', 'agreed', 'made'].includes(body.status)) entry.status = body.status;
           saveDB(db);
           return sendJSON(res, 200, entry);
         }
