@@ -83,6 +83,8 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
 .pick-card.unknown{border-left-color:var(--ink-soft);}
 .pick-card.chosen{border:2px solid var(--gold);border-left-width:4px;}
 .decide-label{font-size:12px;font-weight:600;color:var(--gold);text-transform:uppercase;letter-spacing:.05em;margin:2px 0 8px;}
+.fresh-label{font-size:12px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:.04em;margin:2px 0 8px;}
+#search-results{margin-bottom:8px;}
 .pick-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
 .pick-name{font-family:'Fraunces',serif;font-weight:600;font-size:17px;}
 .pick-meta{font-size:12px;color:var(--ink-soft);margin-top:3px;}
@@ -239,11 +241,16 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     <div id="plan-box"></div>
 
     <h2 class="section-title" style="margin-top:22px;">Suggestions</h2>
-    <p class="hint">Tap “Propose to household” to run a dish by your family on WhatsApp. Once they tap Agree, you can send it to the cook.</p>
-    <button class="btn" id="decide-btn" style="margin-bottom:14px;">🎲 Decide for me</button>
-    <div id="decide-result"></div>
-    <div class="filter-row" id="picks-diet-filter"></div>
-    <div id="picks-list"></div>
+    <p class="hint">Search any dish to propose it, or use the picks below. Once your household agrees, you can send it to the cook.</p>
+    <input type="text" id="dish-search" placeholder="🔍 Search any dish to propose…" style="margin-bottom:12px;" />
+    <div id="search-results"></div>
+    <div id="suggestions-normal">
+      <button class="btn" id="decide-btn" style="margin-bottom:14px;">🎲 Decide for me</button>
+      <div id="decide-result"></div>
+      <div id="fresh-matches"></div>
+      <div class="filter-row" id="picks-diet-filter"></div>
+      <div id="picks-list"></div>
+    </div>
   </div>
 
   <div class="panel" id="panel-dishes">
@@ -376,6 +383,15 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
   function dishSuitsMeal(d, meal){ const mt=dishMealTimes(d); return mt.length===0 || mt.includes(meal); } // untagged = any meal
   function dishDiet(d){ return d.diet==='nonveg' ? 'nonveg' : 'veg'; }
   function dietDot(d){ return `<span class="diet-dot ${dishDiet(d)==='nonveg'?'nonveg':''}"></span>`; }
+  // "what's fresh" matching: normalize common Indian terms so e.g. chhole -> chickpeas
+  const FRESH_SYNONYMS = { chhole:'chickpeas', chole:'chickpeas', chana:'chickpeas', kabuli:'chickpeas', rajma:'kidney beans', aloo:'potato', gobi:'cauliflower', bhindi:'okra', baingan:'brinjal', matar:'peas', mutter:'peas', palak:'spinach', anda:'egg', ande:'egg', murgi:'chicken', dahi:'curd', suji:'semolina', rava:'semolina', besan:'gram flour', sabudana:'tapioca' };
+  function normTerm(t){ t=(t||'').trim().toLowerCase(); return FRESH_SYNONYMS[t]||t; }
+  function dishHaystack(d){ return (d.name+' '+(d.ingredients||[]).join(' ')).toLowerCase(); }
+  function dishMatchesFresh(d){
+    if(!todayIngredients.length) return false;
+    const hay = dishHaystack(d);
+    return todayIngredients.some(ing=>{ const t=normTerm(ing); return t && (hay.includes(t) || hay.includes(ing.toLowerCase())); });
+  }
   function isoForOffset(n){
     const d = new Date(); d.setDate(d.getDate()+n);
     const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), da=String(d.getDate()).padStart(2,'0');
@@ -485,6 +501,36 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     sel.innerHTML = '<option value="">— pick —</option>' + room.people.map(p=>`<option value="${p.id}" ${p.id===myId?'selected':''}>${escapeHtml(p.name)}</option>`).join('');
   }
 
+  // ---- search any dish and propose it (bypasses meal/diet filter) ----
+  document.getElementById('dish-search').addEventListener('input', renderSearch);
+  function renderSearch(){
+    const raw = document.getElementById('dish-search').value.trim();
+    const q = raw.toLowerCase();
+    const results = document.getElementById('search-results');
+    const normal = document.getElementById('suggestions-normal');
+    if(!q){ results.innerHTML=''; results.style.display='none'; normal.style.display=''; return; }
+    normal.style.display='none'; results.style.display='block';
+    const matches = room.dishes.filter(d=>d.name.toLowerCase().includes(q));
+    let html = matches.map(d=>pickCardHtml(d, false)).join('');
+    const exact = room.dishes.some(d=>d.name.toLowerCase()===q);
+    if(!exact) html += `<button class="btn" id="add-propose-btn" style="margin-top:8px;">➕ Add “${escapeHtml(raw)}” &amp; propose</button>`;
+    results.innerHTML = html || `<div class="empty">No dishes found.</div>`;
+    bindPickActions(results);
+    const addBtn = document.getElementById('add-propose-btn');
+    if(addBtn) addBtn.addEventListener('click', ()=>addAndPropose(raw));
+  }
+  async function addAndPropose(name){
+    const cat = DISH_CATALOG.find(c=>c.name.toLowerCase()===name.toLowerCase());
+    const payload = cat
+      ? {name:cat.name, category:cat.category, diet:cat.diet, mealTimes:cat.mealTimes, nutrition:cat.nutrition, cookRating:'unknown'}
+      : {name, category:'other', diet:'veg', mealTimes:[selectedMeal], cookRating:'unknown'};
+    const created = await api(`/room/${roomCode}/dishes`, 'POST', payload);
+    room = await api('/room/'+roomCode, 'GET');
+    renderCategoryFilter(); renderDishDietFilter(); renderDishList(); renderDishSuggestions();
+    const dish = room.dishes.find(d=>d.id===created.id);
+    if(dish) proposeDish(dish);   // proposeDish clears the search + re-renders
+  }
+
   document.querySelectorAll('.tab').forEach(tab=>{
     tab.addEventListener('click', ()=>{
       document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -516,7 +562,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     el.innerHTML = days.map(([v,l])=>`<button class="chip ${selectedDay===v?'on':''}" data-day="${v}">${l}</button>`).join('');
     el.querySelectorAll('[data-day]').forEach(b=>b.addEventListener('click', ()=>{
       selectedDay = b.dataset.day;
-      decidedId = null;
+      decidedId = null; replacingPlanId = null;
       renderDayTabs(); renderNowBar(); renderPlan(); renderPicks(); renderDecideResult();
     }));
   }
@@ -525,7 +571,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     el.innerHTML = MEALS.map(m=>`<button class="chip ${selectedMeal===m?'on':''}" data-meal="${m}">${m}</button>`).join('');
     el.querySelectorAll('[data-meal]').forEach(b=>b.addEventListener('click', ()=>{
       selectedMeal = b.dataset.meal;
-      decidedId = null;
+      decidedId = null; replacingPlanId = null;
       autoSelectPeopleForMeal();
       renderMealTabs(); renderNowBar(); renderTodayPeoplePicker(); renderPlan(); renderPicks(); renderDecideResult();
     }));
@@ -564,7 +610,8 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
         ? `<button class="btn small" data-cook-plan="${p.id}:${p.dishId}">Send to cook 📩</button>
            <button class="btn small secondary" data-made-plan="${p.id}:${p.dishId}">✓ Made</button>`
         : `<button class="btn small" data-agree-plan="${p.id}">Agree ✅</button>
-           <button class="btn small secondary" data-nudge-plan="${p.dishId}">Nudge 📩</button>`;
+           <button class="btn small secondary" data-nudge-plan="${p.dishId}">Nudge 📩</button>
+           <button class="btn small secondary" data-swap-plan="${p.id}">Suggest instead</button>`;
       return `<div class="dish-row" style="align-items:flex-start;">
         <div>
           <div class="dish-row-name">${dish?dietDot(dish):''}${escapeHtml(p.dishName)} ${statusChip}</div>
@@ -582,6 +629,12 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     box.querySelectorAll('[data-nudge-plan]').forEach(btn=>btn.addEventListener('click', ()=>{
       const dish = room.dishes.find(d=>d.id===btn.dataset.nudgePlan);
       if(dish) proposeViaWhatsApp(dish);
+    }));
+    box.querySelectorAll('[data-swap-plan]').forEach(btn=>btn.addEventListener('click', ()=>{
+      replacingPlanId = btn.dataset.swapPlan;
+      const inp = document.getElementById('dish-search');
+      inp.scrollIntoView({behavior:'smooth', block:'center'}); inp.focus();
+      toast('Pick a replacement below — it’ll swap out the old one');
     }));
     box.querySelectorAll('[data-cook-plan]').forEach(btn=>btn.addEventListener('click', ()=>{
       const dish = room.dishes.find(d=>d.id===btn.dataset.cookPlan.split(':')[1]);
@@ -826,9 +879,8 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     const gap = daysSince(d.lastMade);
     let recencyPenalty = gap<=1 ? -3 : gap<=3 ? -1 : 0;
     let ingredientBonus = 0;
-    if(todayIngredients.length>0 && d.ingredients.length>0){
-      const overlap = d.ingredients.filter(i=>todayIngredients.includes(i)).length;
-      ingredientBonus = overlap>0 ? 1.5 : -0.5;
+    if(todayIngredients.length>0){
+      ingredientBonus = dishMatchesFresh(d) ? 2.5 : -0.3;
     }
     return likedFrac*3 + cookWeight + recencyPenalty + ingredientBonus;
   }
@@ -876,6 +928,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     const base = withPhone.length===1 ? 'https://wa.me/'+withPhone[0].phone+'?text=' : 'https://wa.me/?text=';
     window.open(base + encodeURIComponent(msg), '_blank');
   }
+  let replacingPlanId = null;   // set by "Suggest instead" to swap out an existing proposal
   async function proposeDish(dish){
     if(!dish) return;
     const solo = otherMembers().length===0;
@@ -883,8 +936,15 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
       await api(`/room/${roomCode}/plan`, 'POST', {date: isoForDay(selectedDay), meal: selectedMeal, dishId: dish.id, status: solo?'agreed':'proposed', proposedBy: myId||undefined});
       room = await api('/room/'+roomCode, 'GET');
     }
+    if(replacingPlanId){
+      const rep = (room.plan||[]).find(p=>p.id===replacingPlanId);
+      if(rep && rep.dishId!==dish.id){ await api(`/room/${roomCode}/plan/${replacingPlanId}`, 'DELETE'); room = await api('/room/'+roomCode, 'GET'); }
+      replacingPlanId = null;
+    }
     if(solo){ toast('Added — ready for the cook'); }
     else { proposeViaWhatsApp(dish); toast('Shared with household 📩'); }
+    const searchBox = document.getElementById('dish-search');
+    if(searchBox.value){ searchBox.value=''; renderSearch(); }
     renderPlan(); renderPicks(); renderDecideResult();
   }
   function rankedPool(limit){
@@ -893,7 +953,16 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     const ranked = pool.map(d=>({d, score:scoreDish(d)})).sort((a,b)=>b.score-a.score);
     return limit ? ranked.slice(0, limit) : ranked;
   }
+  function renderFreshMatches(){
+    const el = document.getElementById('fresh-matches');
+    if(!todayIngredients.length){ el.innerHTML=''; return; }
+    const pool = rankedPool().map(x=>x.d).filter(dishMatchesFresh).slice(0,5);
+    if(!pool.length){ el.innerHTML=''; return; }
+    el.innerHTML = `<div class="fresh-label">Uses what’s fresh (${todayIngredients.map(escapeHtml).join(', ')})</div>` + pool.map(d=>pickCardHtml(d, false)).join('');
+    bindPickActions(el);
+  }
   function renderPicks(){
+    renderFreshMatches();
     const list = document.getElementById('picks-list');
     if(room.dishes.length===0){ list.innerHTML = '<div class="empty">Add a few dishes in the Dishes tab to get suggestions.</div>'; return; }
     const ranked = rankedPool(6);
@@ -962,6 +1031,26 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
   // A library of common dishes we can suggest. Room's own dishes are filtered out,
   // and the rest are ranked by what the household already leans toward.
   const DISH_CATALOG = [
+    // seeded dishes — included so typing their name auto-fills too
+    { name:'Aloo Paratha', category:'paratha', diet:'veg', mealTimes:['breakfast','dinner'], nutrition:{kcal:260,protein:6,carbs:40,fat:9} },
+    { name:'Gobi Paratha', category:'paratha', diet:'veg', mealTimes:['breakfast','dinner'], nutrition:{kcal:240,protein:6,carbs:36,fat:8} },
+    { name:'Sattu Paratha', category:'paratha', diet:'veg', mealTimes:['breakfast','dinner'], nutrition:{kcal:290,protein:10,carbs:38,fat:10} },
+    { name:'Chana Masala', category:'curry', diet:'veg', mealTimes:['lunch','dinner'], nutrition:{kcal:280,protein:12,carbs:38,fat:9} },
+    { name:'Paneer Butter Masala', category:'paneer', diet:'veg', mealTimes:['lunch','dinner'], nutrition:{kcal:400,protein:14,carbs:14,fat:30} },
+    { name:'Paneer Chilli', category:'paneer', diet:'veg', mealTimes:['lunch','dinner'], nutrition:{kcal:320,protein:16,carbs:18,fat:20} },
+    { name:'Paneer Tikka Masala', category:'paneer', diet:'veg', mealTimes:['lunch','dinner'], nutrition:{kcal:350,protein:16,carbs:16,fat:24} },
+    { name:'Mushroom Masala', category:'curry', diet:'veg', mealTimes:['lunch','dinner'], nutrition:{kcal:180,protein:6,carbs:14,fat:11} },
+    { name:'Chicken Curry', category:'curry', diet:'nonveg', mealTimes:['lunch','dinner'], nutrition:{kcal:330,protein:28,carbs:10,fat:20} },
+    { name:'Egg Curry', category:'egg', diet:'nonveg', mealTimes:['breakfast','lunch','dinner'], nutrition:{kcal:260,protein:16,carbs:10,fat:18} },
+    { name:'Egg Biryani', category:'egg', diet:'nonveg', mealTimes:['lunch','dinner'], nutrition:{kcal:420,protein:14,carbs:60,fat:14} },
+    { name:'Poha', category:'breakfast', diet:'veg', mealTimes:['breakfast'], nutrition:{kcal:250,protein:5,carbs:45,fat:6} },
+    { name:'Upma', category:'breakfast', diet:'veg', mealTimes:['breakfast'], nutrition:{kcal:270,protein:6,carbs:40,fat:9} },
+    { name:'Vermicelli Upma', category:'breakfast', diet:'veg', mealTimes:['breakfast'], nutrition:{kcal:260,protein:5,carbs:42,fat:8} },
+    { name:'Bread Omelette', category:'egg', diet:'nonveg', mealTimes:['breakfast'], nutrition:{kcal:320,protein:14,carbs:28,fat:17} },
+    { name:'Dosa', category:'breakfast', diet:'veg', mealTimes:['breakfast','dinner'], nutrition:{kcal:250,protein:6,carbs:40,fat:7} },
+    { name:'Idli', category:'breakfast', diet:'veg', mealTimes:['breakfast','dinner'], nutrition:{kcal:180,protein:6,carbs:36,fat:1} },
+    { name:'Moong Dal Chilla', category:'breakfast', diet:'veg', mealTimes:['breakfast','dinner'], nutrition:{kcal:220,protein:12,carbs:28,fat:6} },
+    { name:'Cheese Sandwich', category:'breakfast', diet:'veg', mealTimes:['breakfast'], nutrition:{kcal:350,protein:12,carbs:38,fat:17} },
     // breakfast / tiffin
     { name:'Besan Chilla', category:'breakfast', diet:'veg', mealTimes:['breakfast','dinner'], nutrition:{kcal:200,protein:10,carbs:22,fat:8} },
     { name:'Uttapam', category:'breakfast', diet:'veg', mealTimes:['breakfast'], nutrition:{kcal:230,protein:6,carbs:38,fat:6} },
@@ -1056,6 +1145,27 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     renderDishMealPicker(); renderDishPeoplePicker(); renderDishIngredientsPicker();
   }
   document.getElementById('cancel-edit-btn').addEventListener('click', resetDishForm);
+  // auto-fill nutrition/category/diet/meal-times from the library when a known name is typed
+  document.getElementById('dish-name').addEventListener('change', ()=>{
+    if(editingDishId) return; // don't override fields while editing an existing dish
+    const name = document.getElementById('dish-name').value.trim();
+    if(!name) return;
+    const cat = DISH_CATALOG.find(c=>c.name.toLowerCase()===name.toLowerCase());
+    if(!cat) return;
+    let filled = false;
+    const nutIds = ['dish-kcal','dish-protein','dish-carbs','dish-fat'];
+    if(nutIds.every(id=>!document.getElementById(id).value.trim()) && cat.nutrition){
+      document.getElementById('dish-kcal').value = cat.nutrition.kcal ?? '';
+      document.getElementById('dish-protein').value = cat.nutrition.protein ?? '';
+      document.getElementById('dish-carbs').value = cat.nutrition.carbs ?? '';
+      document.getElementById('dish-fat').value = cat.nutrition.fat ?? '';
+      filled = true;
+    }
+    if(dishFormMealTimes.length===0 && cat.mealTimes && cat.mealTimes.length){ dishFormMealTimes = [...cat.mealTimes]; renderDishMealPicker(); filled = true; }
+    document.getElementById('dish-category').value = cat.category;
+    document.getElementById('dish-diet').value = cat.diet;
+    if(filled) toast('Filled from library ✓');
+  });
   document.getElementById('save-dish-btn').addEventListener('click', async ()=>{
     const name = document.getElementById('dish-name').value.trim();
     if(!name){ toast('Give the dish a name'); return; }
@@ -1175,8 +1285,9 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
   }
 
   function renderAll(){
-    decidedId = null;
+    decidedId = null; replacingPlanId = null;
     renderMeSelect();
+    renderSearch();
     renderNowBar(); renderDayTabs(); renderMealTabs(); renderPicksDietFilter();
     renderPlan(); renderDecideResult();
     renderTodayPeoplePicker(); renderTodayIngredients(); renderPicks();
