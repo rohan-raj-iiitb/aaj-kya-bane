@@ -24,7 +24,7 @@
   --white:#FFFFFF;
 }
 *{box-sizing:border-box;}
-html,body{margin:0;padding:0;}
+html,body{margin:0;padding:0;-webkit-text-size-adjust:100%;text-size-adjust:100%;}
 body{
   background:var(--bg); color:var(--ink);
   font-family:'Inter',system-ui,sans-serif; line-height:1.5;
@@ -33,8 +33,8 @@ body{
 .wrap{max-width:640px;margin:0 auto;padding:18px 18px 0;}
 
 /* branded top header */
-#app-header{position:sticky;top:0;z-index:40;background:var(--ink);border-bottom:2px solid var(--gold);}
-.header-inner{max-width:640px;margin:0 auto;padding:12px 18px;display:flex;align-items:center;justify-content:center;}
+#app-header{position:sticky;top:0;z-index:40;background:var(--ink);border-bottom:2px solid var(--gold);padding-top:env(safe-area-inset-top);}
+.header-inner{max-width:640px;margin:0 auto;padding:12px max(18px,env(safe-area-inset-right)) 12px max(18px,env(safe-area-inset-left));display:flex;align-items:center;justify-content:center;}
 .brand{display:flex;align-items:center;gap:9px;font-family:'Fraunces',serif;font-weight:600;font-size:20px;letter-spacing:-0.01em;color:var(--bg);}
 .brand-logo{font-size:21px;line-height:1;}
 
@@ -79,7 +79,7 @@ button.btn.small{padding:7px 12px;font-size:13px;width:auto;}
 .you-are select{width:auto;padding:3px 6px;font-size:13px;display:inline-block;}
 .plan-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;}
 .person-phone{margin-top:7px;max-width:230px;}
-.person-name-input{font-family:'Fraunces',serif;font-weight:600;font-size:15.5px;border:1px solid transparent;background:transparent;padding:2px 5px;border-radius:6px;width:100%;max-width:230px;color:var(--ink);}
+.person-name-input{font-family:'Fraunces',serif;font-weight:600;font-size:16px;border:1px solid transparent;background:transparent;padding:2px 5px;border-radius:6px;width:100%;max-width:230px;color:var(--ink);}
 .person-name-input:focus{border-color:var(--card-line);background:var(--white);outline:none;}
 .room-banner b{font-family:'Fraunces',serif;letter-spacing:1px;}
 .room-banner button{background:none;border:none;color:var(--ink-soft);text-decoration:underline;font-size:13px;cursor:pointer;}
@@ -99,7 +99,7 @@ h2.section-title{font-family:'Fraunces',serif;font-weight:500;font-size:18px;mar
 .chip .x{margin-left:6px;color:var(--ink-soft);}
 .chip.on .x{color:var(--white);opacity:.7;}
 
-input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9px 11px;border:1px solid var(--card-line);border-radius:8px;background:var(--white);color:var(--ink);width:100%;}
+input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9px 11px;border:1px solid var(--card-line);border-radius:8px;background:var(--white);color:var(--ink);width:100%;}
 .tag-input-row{display:flex;gap:8px;margin-bottom:8px;}
 .tag-input-row input{flex:1;min-width:0;}
 .nut-field{display:flex;flex-direction:column;gap:3px;}
