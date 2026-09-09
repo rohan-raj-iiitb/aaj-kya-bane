@@ -41,6 +41,64 @@ function newRoomCode() {
   return code;
 }
 
+// Cuisine-tagged starter library. A new room is seeded from the cuisines the
+// household picks (diet leaning is a filter default, so we seed both veg & non-veg).
+const CUISINES = ['north-indian', 'south-indian', 'chinese', 'italian'];
+const DISH_LIBRARY = [
+  // ---- North Indian ----
+  { name: 'Aloo Paratha', cuisine: 'north-indian', category: 'paratha', diet: 'veg', mealTimes: ['breakfast', 'dinner'], ingredients: ['potato', 'wheat flour'], nutrition: { kcal: 260, protein: 6, carbs: 40, fat: 9 } },
+  { name: 'Gobi Paratha', cuisine: 'north-indian', category: 'paratha', diet: 'veg', mealTimes: ['breakfast', 'dinner'], ingredients: ['cauliflower', 'wheat flour'], nutrition: { kcal: 240, protein: 6, carbs: 36, fat: 8 } },
+  { name: 'Chana Masala', cuisine: 'north-indian', category: 'curry', diet: 'veg', mealTimes: ['lunch', 'dinner'], ingredients: ['chickpeas', 'onion', 'tomato'], nutrition: { kcal: 280, protein: 12, carbs: 38, fat: 9 } },
+  { name: 'Rajma', cuisine: 'north-indian', category: 'curry', diet: 'veg', mealTimes: ['lunch', 'dinner'], ingredients: ['kidney beans', 'onion', 'tomato'], nutrition: { kcal: 290, protein: 13, carbs: 40, fat: 8 } },
+  { name: 'Dal Tadka', cuisine: 'north-indian', category: 'dal', diet: 'veg', mealTimes: ['lunch', 'dinner'], ingredients: ['toor dal', 'garlic'], nutrition: { kcal: 200, protein: 10, carbs: 28, fat: 6 } },
+  { name: 'Dal Makhani', cuisine: 'north-indian', category: 'dal', diet: 'veg', mealTimes: ['lunch', 'dinner'], ingredients: ['black dal', 'butter', 'cream'], nutrition: { kcal: 330, protein: 12, carbs: 30, fat: 18 } },
+  { name: 'Paneer Butter Masala', cuisine: 'north-indian', category: 'paneer', diet: 'veg', mealTimes: ['lunch', 'dinner'], ingredients: ['paneer', 'butter', 'tomato'], nutrition: { kcal: 400, protein: 14, carbs: 14, fat: 30 } },
+  { name: 'Palak Paneer', cuisine: 'north-indian', category: 'paneer', diet: 'veg', mealTimes: ['lunch', 'dinner'], ingredients: ['paneer', 'spinach'], nutrition: { kcal: 300, protein: 14, carbs: 12, fat: 22 } },
+  { name: 'Bhindi Masala', cuisine: 'north-indian', category: 'curry', diet: 'veg', mealTimes: ['lunch', 'dinner'], ingredients: ['okra', 'onion'], nutrition: { kcal: 180, protein: 4, carbs: 14, fat: 12 } },
+  { name: 'Jeera Rice', cuisine: 'north-indian', category: 'rice', diet: 'veg', mealTimes: ['lunch', 'dinner'], ingredients: ['rice', 'cumin'], nutrition: { kcal: 280, protein: 5, carbs: 52, fat: 6 } },
+  { name: 'Poha', cuisine: 'north-indian', category: 'breakfast', diet: 'veg', mealTimes: ['breakfast'], ingredients: ['flattened rice', 'onion', 'peanuts'], nutrition: { kcal: 250, protein: 5, carbs: 45, fat: 6 } },
+  { name: 'Moong Dal Chilla', cuisine: 'north-indian', category: 'breakfast', diet: 'veg', mealTimes: ['breakfast', 'dinner'], ingredients: ['moong dal', 'onion'], nutrition: { kcal: 220, protein: 12, carbs: 28, fat: 6 } },
+  { name: 'Chicken Curry', cuisine: 'north-indian', category: 'curry', diet: 'nonveg', mealTimes: ['lunch', 'dinner'], ingredients: ['chicken', 'onion', 'tomato'], nutrition: { kcal: 330, protein: 28, carbs: 10, fat: 20 } },
+  { name: 'Butter Chicken', cuisine: 'north-indian', category: 'curry', diet: 'nonveg', mealTimes: ['lunch', 'dinner'], ingredients: ['chicken', 'butter', 'tomato'], nutrition: { kcal: 420, protein: 27, carbs: 12, fat: 30 } },
+  { name: 'Egg Curry', cuisine: 'north-indian', category: 'egg', diet: 'nonveg', mealTimes: ['breakfast', 'lunch', 'dinner'], ingredients: ['egg', 'onion', 'tomato'], nutrition: { kcal: 260, protein: 16, carbs: 10, fat: 18 } },
+  { name: 'Chicken Biryani', cuisine: 'north-indian', category: 'rice', diet: 'nonveg', mealTimes: ['lunch', 'dinner'], ingredients: ['chicken', 'rice', 'spices'], nutrition: { kcal: 450, protein: 25, carbs: 55, fat: 15 } },
+  // ---- South Indian ----
+  { name: 'Plain Dosa', cuisine: 'south-indian', category: 'breakfast', diet: 'veg', mealTimes: ['breakfast', 'dinner'], ingredients: ['rice', 'urad dal'], nutrition: { kcal: 250, protein: 6, carbs: 40, fat: 7 } },
+  { name: 'Masala Dosa', cuisine: 'south-indian', category: 'breakfast', diet: 'veg', mealTimes: ['breakfast', 'dinner'], ingredients: ['rice', 'potato'], nutrition: { kcal: 330, protein: 7, carbs: 52, fat: 10 } },
+  { name: 'Idli', cuisine: 'south-indian', category: 'breakfast', diet: 'veg', mealTimes: ['breakfast', 'dinner'], ingredients: ['rice', 'urad dal'], nutrition: { kcal: 180, protein: 6, carbs: 36, fat: 1 } },
+  { name: 'Uttapam', cuisine: 'south-indian', category: 'breakfast', diet: 'veg', mealTimes: ['breakfast'], ingredients: ['rice', 'onion'], nutrition: { kcal: 230, protein: 6, carbs: 38, fat: 6 } },
+  { name: 'Medu Vada', cuisine: 'south-indian', category: 'snack', diet: 'veg', mealTimes: ['breakfast'], ingredients: ['urad dal'], nutrition: { kcal: 280, protein: 8, carbs: 30, fat: 14 } },
+  { name: 'Upma', cuisine: 'south-indian', category: 'breakfast', diet: 'veg', mealTimes: ['breakfast'], ingredients: ['semolina', 'vegetables'], nutrition: { kcal: 270, protein: 6, carbs: 40, fat: 9 } },
+  { name: 'Ven Pongal', cuisine: 'south-indian', category: 'breakfast', diet: 'veg', mealTimes: ['breakfast'], ingredients: ['rice', 'moong dal'], nutrition: { kcal: 300, protein: 9, carbs: 45, fat: 9 } },
+  { name: 'Sambar', cuisine: 'south-indian', category: 'curry', diet: 'veg', mealTimes: ['lunch', 'dinner'], ingredients: ['toor dal', 'vegetables', 'tamarind'], nutrition: { kcal: 150, protein: 7, carbs: 22, fat: 4 } },
+  { name: 'Rasam', cuisine: 'south-indian', category: 'curry', diet: 'veg', mealTimes: ['lunch', 'dinner'], ingredients: ['tamarind', 'tomato'], nutrition: { kcal: 90, protein: 3, carbs: 14, fat: 2 } },
+  { name: 'Curd Rice', cuisine: 'south-indian', category: 'rice', diet: 'veg', mealTimes: ['lunch', 'dinner'], ingredients: ['rice', 'curd'], nutrition: { kcal: 250, protein: 7, carbs: 40, fat: 7 } },
+  { name: 'Lemon Rice', cuisine: 'south-indian', category: 'rice', diet: 'veg', mealTimes: ['lunch', 'dinner'], ingredients: ['rice', 'lemon', 'peanuts'], nutrition: { kcal: 270, protein: 5, carbs: 48, fat: 7 } },
+  { name: 'Coconut Rice', cuisine: 'south-indian', category: 'rice', diet: 'veg', mealTimes: ['lunch', 'dinner'], ingredients: ['rice', 'coconut'], nutrition: { kcal: 300, protein: 5, carbs: 46, fat: 11 } },
+  // ---- Chinese (Indo) ----
+  { name: 'Veg Hakka Noodles', cuisine: 'chinese', category: 'noodles', diet: 'veg', mealTimes: ['lunch', 'dinner'], ingredients: ['noodles', 'vegetables'], nutrition: { kcal: 350, protein: 8, carbs: 55, fat: 11 } },
+  { name: 'Chicken Hakka Noodles', cuisine: 'chinese', category: 'noodles', diet: 'nonveg', mealTimes: ['lunch', 'dinner'], ingredients: ['noodles', 'chicken'], nutrition: { kcal: 400, protein: 20, carbs: 52, fat: 13 } },
+  { name: 'Schezwan Noodles', cuisine: 'chinese', category: 'noodles', diet: 'veg', mealTimes: ['lunch', 'dinner'], ingredients: ['noodles', 'schezwan sauce'], nutrition: { kcal: 370, protein: 8, carbs: 56, fat: 13 } },
+  { name: 'Veg Fried Rice', cuisine: 'chinese', category: 'rice', diet: 'veg', mealTimes: ['lunch', 'dinner'], ingredients: ['rice', 'vegetables'], nutrition: { kcal: 330, protein: 7, carbs: 58, fat: 8 } },
+  { name: 'Egg Fried Rice', cuisine: 'chinese', category: 'rice', diet: 'nonveg', mealTimes: ['lunch', 'dinner'], ingredients: ['rice', 'egg'], nutrition: { kcal: 360, protein: 12, carbs: 56, fat: 10 } },
+  { name: 'Chilli Paneer', cuisine: 'chinese', category: 'paneer', diet: 'veg', mealTimes: ['lunch', 'dinner'], ingredients: ['paneer', 'capsicum'], nutrition: { kcal: 320, protein: 16, carbs: 18, fat: 20 } },
+  { name: 'Chilli Chicken', cuisine: 'chinese', category: 'curry', diet: 'nonveg', mealTimes: ['lunch', 'dinner'], ingredients: ['chicken', 'capsicum'], nutrition: { kcal: 350, protein: 26, carbs: 16, fat: 20 } },
+  { name: 'Gobi Manchurian', cuisine: 'chinese', category: 'snack', diet: 'veg', mealTimes: ['lunch', 'dinner'], ingredients: ['cauliflower', 'cornflour'], nutrition: { kcal: 300, protein: 6, carbs: 34, fat: 16 } },
+  { name: 'Veg Manchurian', cuisine: 'chinese', category: 'snack', diet: 'veg', mealTimes: ['lunch', 'dinner'], ingredients: ['vegetables', 'cornflour'], nutrition: { kcal: 290, protein: 6, carbs: 32, fat: 15 } },
+  { name: 'Spring Rolls', cuisine: 'chinese', category: 'snack', diet: 'veg', mealTimes: ['breakfast', 'dinner'], ingredients: ['vegetables', 'wrapper'], nutrition: { kcal: 250, protein: 5, carbs: 30, fat: 12 } },
+  // ---- Italian ----
+  { name: 'Red Sauce Pasta', cuisine: 'italian', category: 'pasta', diet: 'veg', mealTimes: ['lunch', 'dinner'], ingredients: ['pasta', 'tomato'], nutrition: { kcal: 350, protein: 10, carbs: 58, fat: 9 } },
+  { name: 'White Sauce Pasta', cuisine: 'italian', category: 'pasta', diet: 'veg', mealTimes: ['lunch', 'dinner'], ingredients: ['pasta', 'cream', 'cheese'], nutrition: { kcal: 420, protein: 12, carbs: 52, fat: 18 } },
+  { name: 'Pesto Pasta', cuisine: 'italian', category: 'pasta', diet: 'veg', mealTimes: ['lunch', 'dinner'], ingredients: ['pasta', 'basil'], nutrition: { kcal: 400, protein: 11, carbs: 54, fat: 16 } },
+  { name: 'Penne Alfredo', cuisine: 'italian', category: 'pasta', diet: 'veg', mealTimes: ['lunch', 'dinner'], ingredients: ['penne', 'cream'], nutrition: { kcal: 450, protein: 13, carbs: 54, fat: 20 } },
+  { name: 'Chicken Pasta', cuisine: 'italian', category: 'pasta', diet: 'nonveg', mealTimes: ['lunch', 'dinner'], ingredients: ['pasta', 'chicken'], nutrition: { kcal: 440, protein: 26, carbs: 50, fat: 16 } },
+  { name: 'Margherita Pizza', cuisine: 'italian', category: 'pizza', diet: 'veg', mealTimes: ['lunch', 'dinner'], ingredients: ['pizza base', 'cheese', 'tomato'], nutrition: { kcal: 480, protein: 18, carbs: 58, fat: 18 } },
+  { name: 'Veg Pizza', cuisine: 'italian', category: 'pizza', diet: 'veg', mealTimes: ['lunch', 'dinner'], ingredients: ['pizza base', 'vegetables', 'cheese'], nutrition: { kcal: 500, protein: 18, carbs: 60, fat: 20 } },
+  { name: 'Garlic Bread', cuisine: 'italian', category: 'snack', diet: 'veg', mealTimes: ['lunch', 'dinner'], ingredients: ['bread', 'garlic', 'butter'], nutrition: { kcal: 330, protein: 8, carbs: 44, fat: 14 } },
+  { name: 'Veg Risotto', cuisine: 'italian', category: 'rice', diet: 'veg', mealTimes: ['lunch', 'dinner'], ingredients: ['rice', 'parmesan'], nutrition: { kcal: 400, protein: 10, carbs: 56, fat: 15 } },
+  { name: 'Mushroom Risotto', cuisine: 'italian', category: 'rice', diet: 'veg', mealTimes: ['lunch', 'dinner'], ingredients: ['rice', 'mushroom'], nutrition: { kcal: 380, protein: 10, carbs: 54, fat: 14 } },
+];
+
 // diet: 'veg' | 'nonveg' (egg is treated as non-veg here)
 // mealTimes: which meals a dish suits — subset of ['breakfast','lunch','dinner']
 const SEED_DISHES = [
@@ -73,23 +131,33 @@ function normalizeMeals(m) {
   return { breakfast: m.breakfast !== false, lunch: m.lunch !== false, dinner: m.dinner !== false };
 }
 
-function createRoom(db) {
+function createRoom(db, opts = {}) {
   let code;
   do { code = newRoomCode(); } while (db.rooms[code]);
+  // seed dishes from the chosen cuisines (default to North Indian if none/skipped)
+  const cuisines = Array.isArray(opts.cuisines) ? opts.cuisines.filter(c => CUISINES.includes(c)) : [];
+  const seedFrom = cuisines.length ? DISH_LIBRARY.filter(d => cuisines.includes(d.cuisine))
+                                   : DISH_LIBRARY.filter(d => d.cuisine === 'north-indian');
+  const names = Array.isArray(opts.people) ? opts.people.map(n => String(n || '').trim()).filter(Boolean) : [];
+  const people = (names.length ? names : ['Me']).map(n => ({ id: newId(), name: n, meals: normalizeMeals(), phone: '' }));
   db.rooms[code] = {
     code,
     createdAt: new Date().toISOString(),
+    householdName: typeof opts.householdName === 'string' ? opts.householdName.trim() : '',
+    dietPref: ['veg', 'nonveg', 'both'].includes(opts.dietPref) ? opts.dietPref : 'both',
+    cuisines,
     cookLanguage: '',
     cookName: '',  // what the household calls the cook (e.g. Didi, Bhaiya, a name)
     cookPhone: '', // cook's WhatsApp number (digits only, incl. country code)
-    people: [{ id: newId(), name: 'Me', meals: normalizeMeals(), phone: '' }],
-    dishes: SEED_DISHES.map(d => ({
+    people,
+    dishes: seedFrom.map(d => ({
       id: newId(),
       name: d.name,
       category: d.category,
       diet: d.diet,             // 'veg' | 'nonveg'
       mealTimes: d.mealTimes,   // which meals this dish suits
-      cookRating: d.cookRating,
+      cuisine: d.cuisine,
+      cookRating: 'unknown',    // fresh household — rate as you go
       likedBy: [],
       ingredients: d.ingredients,
       nutrition: d.nutrition, // approximate, per serving — informational only
@@ -160,7 +228,8 @@ const server = http.createServer(async (req, res) => {
   try {
     // POST /api/room  -> create room
     if (req.method === 'POST' && parts.length === 2 && parts[1] === 'room') {
-      const room = createRoom(db);
+      const body = await readBody(req);
+      const room = createRoom(db, body);
       return sendJSON(res, 200, room);
     }
 
@@ -180,6 +249,7 @@ const server = http.createServer(async (req, res) => {
       if (req.method === 'PUT' && parts.length === 3) {
         const body = await readBody(req);
         if (typeof body.cookLanguage === 'string') room.cookLanguage = body.cookLanguage;
+        if (typeof body.householdName === 'string') room.householdName = body.householdName.trim();
         if (typeof body.cookName === 'string') room.cookName = body.cookName.trim();
         if (typeof body.cookPhone === 'string') room.cookPhone = body.cookPhone.replace(/\D/g, ''); // digits only, wa.me-ready
         saveDB(db);

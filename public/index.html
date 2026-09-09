@@ -62,6 +62,14 @@ p.tagline{margin:0 0 22px;color:var(--ink-soft);font-size:14.5px;}
 .gate-error{color:var(--red);font-size:13px;margin-top:8px;}
 .or-sep{color:var(--ink-soft);font-size:13px;margin:14px 0;}
 
+/* --- create-room setup wizard --- */
+#setup{max-width:440px;margin:34px auto;padding:0 20px 40px;text-align:center;}
+#setup h1{font-family:'Fraunces',serif;font-size:26px;margin-bottom:6px;}
+#setup p{color:var(--ink-soft);font-size:14px;margin-bottom:20px;}
+.setup-card{background:var(--card);border:1px solid var(--card-line);border-radius:10px;padding:20px;margin-bottom:16px;text-align:left;}
+.setup-card label{display:block;font-size:12.5px;font-weight:600;color:var(--ink-soft);margin-bottom:6px;}
+.setup-card input[type=text]{width:100%;}
+
 button.btn{font-family:'Inter',sans-serif;font-size:14.5px;font-weight:600;padding:11px 18px;border-radius:8px;border:1px solid var(--ink);background:var(--ink);color:var(--white);cursor:pointer;width:100%;}
 button.btn.secondary{background:var(--white);color:var(--ink);border:1px solid var(--card-line);}
 button.btn.small{padding:7px 12px;font-size:13px;width:auto;}
@@ -235,9 +243,32 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
   <button class="btn secondary" id="create-btn">Create a new room</button>
 </div>
 
+<div id="setup" style="display:none;">
+  <div class="gate-logo">🍲</div>
+  <h1>Set up your kitchen</h1>
+  <p>A few quick things so your list feels like home. Change any of it later.</p>
+  <div class="setup-card">
+    <label>Household name</label>
+    <input type="text" id="setup-household" placeholder="e.g. The Sharmas · Flat 402" />
+    <div style="height:16px;"></div>
+    <label>Who’s in the household?</label>
+    <div class="tag-input-row"><input type="text" id="setup-member" placeholder="Add a name" /><button class="btn" id="setup-member-add" style="width:auto;">Add</button></div>
+    <div class="chip-row" id="setup-members"></div>
+    <div style="height:16px;"></div>
+    <label>Mostly veg or non-veg?</label>
+    <div class="chip-row" id="setup-diet"></div>
+    <div style="height:16px;"></div>
+    <label>Which cuisines do you eat? <span style="font-weight:400;color:var(--ink-soft);">(pick any)</span></label>
+    <div class="chip-row" id="setup-cuisines"></div>
+  </div>
+  <button class="btn" id="setup-create">Create room</button>
+  <div style="height:10px;"></div>
+  <button class="btn secondary" id="setup-skip">Skip — use a default list</button>
+</div>
+
 <div class="wrap" id="app" style="display:none;">
   <div class="room-banner">
-    <span>Room: <b id="room-code-display"></b></span>
+    <span><span id="household-name-display"></span>Room <b id="room-code-display"></b></span>
     <span class="you-are">You’re <select id="me-select"></select></span>
     <button id="leave-btn">Switch room</button>
   </div>
@@ -285,6 +316,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
           <option value="paratha">Paratha / roti</option><option value="paneer">Paneer</option>
           <option value="curry">Curry / gravy</option><option value="dal">Dal</option>
           <option value="rice">Rice</option><option value="egg">Egg</option>
+          <option value="noodles">Noodles</option><option value="pasta">Pasta</option><option value="pizza">Pizza</option>
           <option value="snack">Snack</option><option value="other">Other</option>
         </select>
       </div>
@@ -484,6 +516,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
       roomCode = code;
       localStorage.setItem('aajkyabane-room', code);
       myId = localStorage.getItem('aajkyabane-me-'+roomCode) || '';
+      if(room.dietPref && room.dietPref!=='both'){ picksDietFilter=room.dietPref; dishDietFilter=room.dietPref; }
       document.getElementById('gate').style.display='none';
       document.getElementById('app').style.display='block';
       document.getElementById('app-header').style.display='block';
@@ -503,20 +536,55 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     const ok = await tryEnterRoom(code);
     if(!ok) document.getElementById('join-error').textContent = "Couldn't find that room — check the code with whoever shared it.";
   });
-  document.getElementById('create-btn').addEventListener('click', async ()=>{
-    room = await api('/room','POST');
+  // ---- create-room setup wizard ----
+  let setupMembers = [], setupDiet = 'both', setupCuisines = ['north-indian'];
+  function renderSetupMembers(){
+    const el = document.getElementById('setup-members');
+    el.innerHTML = setupMembers.map((m,i)=>`<span class="chip on">${escapeHtml(m)} <span class="x" data-rm-member="${i}">×</span></span>`).join('');
+    el.querySelectorAll('[data-rm-member]').forEach(x=>x.addEventListener('click', ()=>{ setupMembers.splice(+x.dataset.rmMember,1); renderSetupMembers(); }));
+  }
+  function renderSetupDiet(){
+    const el = document.getElementById('setup-diet');
+    const opts = [['both','Both'],['veg','Veg'],['nonveg','Non-veg']];
+    el.innerHTML = opts.map(([v,l])=>`<button type="button" class="chip ${setupDiet===v?'on':''}" data-diet="${v}">${l}</button>`).join('');
+    el.querySelectorAll('[data-diet]').forEach(b=>b.addEventListener('click', ()=>{ setupDiet=b.dataset.diet; renderSetupDiet(); }));
+  }
+  function renderSetupCuisines(){
+    const el = document.getElementById('setup-cuisines');
+    const opts = [['north-indian','North Indian'],['south-indian','South Indian'],['chinese','Chinese'],['italian','Italian']];
+    el.innerHTML = opts.map(([v,l])=>`<button type="button" class="chip ${setupCuisines.includes(v)?'on':''}" data-cuisine="${v}">${l}</button>`).join('');
+    el.querySelectorAll('[data-cuisine]').forEach(b=>b.addEventListener('click', ()=>{ const c=b.dataset.cuisine; setupCuisines = setupCuisines.includes(c) ? setupCuisines.filter(x=>x!==c) : [...setupCuisines, c]; renderSetupCuisines(); }));
+  }
+  function addSetupMember(){ const inp=document.getElementById('setup-member'); const v=inp.value.trim(); if(v){ setupMembers.push(v); inp.value=''; renderSetupMembers(); } inp.focus(); }
+  document.getElementById('setup-member-add').addEventListener('click', addSetupMember);
+  document.getElementById('setup-member').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); addSetupMember(); } });
+  document.getElementById('create-btn').addEventListener('click', ()=>{
+    setupMembers=[]; setupDiet='both'; setupCuisines=['north-indian'];
+    document.getElementById('setup-household').value=''; document.getElementById('setup-member').value='';
+    renderSetupMembers(); renderSetupDiet(); renderSetupCuisines();
+    document.getElementById('gate').style.display='none';
+    document.getElementById('setup').style.display='block';
+  });
+  async function createAndEnter(payload){
+    room = await api('/room','POST', payload);
     roomCode = room.code;
     localStorage.setItem('aajkyabane-room', roomCode);
-    myId = room.people[0] ? room.people[0].id : '';   // creator is the seeded "Me"
+    myId = room.people[0] ? room.people[0].id : '';
     localStorage.setItem('aajkyabane-me-'+roomCode, myId);
+    if(room.dietPref && room.dietPref!=='both'){ picksDietFilter=room.dietPref; dishDietFilter=room.dietPref; }
     document.getElementById('gate').style.display='none';
+    document.getElementById('setup').style.display='none';
     document.getElementById('app').style.display='block';
     document.getElementById('app-header').style.display='block';
     document.getElementById('bottom-nav').style.display='flex';
     document.getElementById('room-code-display').textContent = roomCode;
     autoSelectPeopleForMeal();
     renderAll();
+  }
+  document.getElementById('setup-create').addEventListener('click', ()=>{
+    createAndEnter({ householdName: document.getElementById('setup-household').value.trim(), dietPref: setupDiet, cuisines: setupCuisines, people: setupMembers });
   });
+  document.getElementById('setup-skip').addEventListener('click', ()=>createAndEnter({}));
   document.getElementById('leave-btn').addEventListener('click', ()=>{
     localStorage.removeItem('aajkyabane-room');
     location.reload();
@@ -1277,7 +1345,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
 
   function renderCategoryFilter(){
     const cats = ['all', ...new Set(room.dishes.map(d=>d.category))];
-    const labels = {all:'All', breakfast:'Breakfast', paratha:'Paratha', paneer:'Paneer', curry:'Curry', dal:'Dal', rice:'Rice', egg:'Egg', snack:'Snack', other:'Other'};
+    const labels = {all:'All', breakfast:'Breakfast', paratha:'Paratha', paneer:'Paneer', curry:'Curry', dal:'Dal', rice:'Rice', egg:'Egg', noodles:'Noodles', pasta:'Pasta', pizza:'Pizza', snack:'Snack', other:'Other'};
     const el = document.getElementById('dish-category-filter');
     el.innerHTML = cats.map(c=>`<button class="chip ${dishCategoryFilter===c?'on':''}" data-cat="${c}">${labels[c]||c}</button>`).join('');
     el.querySelectorAll('[data-cat]').forEach(chip=>{
@@ -1402,6 +1470,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     renderDishPeoplePicker(); renderDishIngredientsPicker(); renderDishMealPicker();
     renderCategoryFilter(); renderDishDietFilter(); renderDishList(); renderDishSuggestions();
     renderPeopleList();
+    document.getElementById('household-name-display').textContent = room.householdName ? room.householdName+' · ' : '';
     document.getElementById('cook-language').value = room.cookLanguage || '';
     document.getElementById('cook-name').value = room.cookName || '';
     document.getElementById('cook-phone').value = room.cookPhone || '';
