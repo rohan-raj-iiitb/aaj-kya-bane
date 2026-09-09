@@ -82,8 +82,17 @@ button.btn.small{padding:7px 12px;font-size:13px;width:auto;}
 .person-name-input{font-family:'Fraunces',serif;font-weight:600;font-size:16px;border:1px solid transparent;background:transparent;padding:2px 5px;border-radius:6px;width:100%;max-width:230px;color:var(--ink);}
 .person-name-input:focus{border-color:var(--card-line);background:var(--white);outline:none;}
 .room-banner b{font-family:'Fraunces',serif;letter-spacing:1px;}
-.room-banner button{background:none;border:none;color:var(--ink-soft);text-decoration:underline;font-size:13px;cursor:pointer;}
-.room-banner .invite-link{color:var(--gold);font-weight:600;}
+.rb-left{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.rb-left b{font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rb-menu-wrap{position:relative;flex:none;}
+.rb-menu-btn{background:none;border:none;font-size:22px;line-height:1;color:var(--ink-soft);cursor:pointer;padding:2px 8px;}
+.rb-menu{position:absolute;right:0;top:100%;margin-top:8px;background:var(--white);border:1px solid var(--card-line);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.18);padding:8px;min-width:230px;display:none;z-index:45;}
+.rb-menu.show{display:block;}
+.rb-menu-code{font-size:12.5px;color:var(--ink-soft);padding:6px 8px;border-bottom:1px solid var(--card-line);margin-bottom:4px;}
+.rb-menu-code b{letter-spacing:1px;color:var(--ink);}
+.rb-copy{background:none;border:none;color:var(--gold);cursor:pointer;font-size:12px;text-decoration:underline;padding:0 0 0 6px;}
+.rb-menu-item{display:block;width:100%;text-align:left;background:none;border:none;padding:9px 8px;font-size:13.5px;color:var(--ink);cursor:pointer;border-radius:6px;font-family:'Inter',sans-serif;text-decoration:none;}
+.rb-menu-item:hover{background:var(--bg);}
 
 .tabs{display:flex;gap:20px;border-bottom:1px solid var(--card-line);margin-bottom:20px;overflow-x:auto;}
 .tab{background:none;border:none;cursor:pointer;font-size:14.5px;font-weight:600;color:var(--ink-soft);padding:0 0 12px;position:relative;white-space:nowrap;}
@@ -292,10 +301,18 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
 
 <div class="wrap" id="app" style="display:none;">
   <div class="room-banner">
-    <span><span id="household-name-display"></span>Room <b id="room-code-display"></b></span>
-    <span class="you-are">You’re <select id="me-select"></select></span>
-    <button class="invite-link" data-invite>Invite 🔗</button>
-    <button id="leave-btn">Switch room</button>
+    <span class="rb-left">
+      <b id="household-name-display">My household</b>
+      <span class="you-are">You’re <select id="me-select"></select></span>
+    </span>
+    <div class="rb-menu-wrap">
+      <button class="rb-menu-btn" id="rb-menu-btn" aria-label="Room menu">⋯</button>
+      <div class="rb-menu" id="rb-menu">
+        <div class="rb-menu-code">Room <b id="room-code-display"></b> <button class="rb-copy" id="copy-code-btn">copy</button></div>
+        <button class="rb-menu-item" data-invite>🔗 Invite family to this room</button>
+        <button class="rb-menu-item" id="leave-btn">Switch room</button>
+      </div>
+    </div>
   </div>
 
   <div class="panel active" id="panel-today">
@@ -545,6 +562,12 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
       return data;
     } finally { loadEnd(); }
   }
+  // surface any failed action instead of failing silently
+  window.addEventListener('unhandledrejection', e=>{
+    const m = (e.reason && e.reason.message) || '';
+    if(/body too large/i.test(m)) return;
+    toast(/fetch|network|load failed/i.test(m) ? 'Couldn’t reach the server — check your connection' : (m || 'Something went wrong'));
+  });
 
   async function tryEnterRoom(code){
     try{
@@ -622,8 +645,18 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
     createAndEnter({ householdName: document.getElementById('setup-household').value.trim(), dietPref: setupDiet, cuisines: setupCuisines, people: setupMembers });
   });
   document.getElementById('setup-skip').addEventListener('click', ()=>createAndEnter({}));
-  document.getElementById('leave-btn').addEventListener('click', ()=>{
+  const rbMenu = document.getElementById('rb-menu'), rbBtn = document.getElementById('rb-menu-btn');
+  rbBtn.addEventListener('click', e=>{ e.stopPropagation(); rbMenu.classList.toggle('show'); });
+  document.addEventListener('click', e=>{ if(!rbMenu.contains(e.target) && e.target!==rbBtn) rbMenu.classList.remove('show'); });
+  rbMenu.querySelectorAll('.rb-menu-item').forEach(b=>b.addEventListener('click', ()=>rbMenu.classList.remove('show')));
+  document.getElementById('copy-code-btn').addEventListener('click', ()=>{
+    if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(roomCode).then(()=>toast('Room code copied ✓')).catch(()=>toast('Room code: '+roomCode));
+    else toast('Room code: '+roomCode);
+  });
+  document.getElementById('leave-btn').addEventListener('click', async ()=>{
+    if(!await confirmDialog('Leave this room? You’ll need the code ('+roomCode+') to rejoin.', 'Leave')) return;
     localStorage.removeItem('aajkyabane-room');
+    localStorage.removeItem('aajkyabane-me-'+roomCode);
     location.reload();
   });
   function inviteFamily(){
@@ -654,7 +687,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
     const name = document.getElementById('household-name-input').value.trim();
     room = await api(`/room/${roomCode}`, 'PUT', {householdName:name});
     document.getElementById('household-name-input').value = room.householdName || '';
-    document.getElementById('household-name-display').textContent = room.householdName ? room.householdName+' · ' : '';
+    document.getElementById('household-name-display').textContent = room.householdName || 'My household';
     toast(room.householdName ? 'Household name saved ✓' : 'Name cleared');
   });
   document.getElementById('backup-btn').addEventListener('click', ()=>{
@@ -1599,7 +1632,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
     renderDishPeoplePicker(); renderDishIngredientsPicker(); renderDishMealPicker();
     renderCategoryFilter(); renderDishDietFilter(); renderDishList(); renderDishSuggestions();
     renderPeopleList();
-    document.getElementById('household-name-display').textContent = room.householdName ? room.householdName+' · ' : '';
+    document.getElementById('household-name-display').textContent = room.householdName || 'My household';
     document.getElementById('household-name-input').value = room.householdName || '';
     document.getElementById('cook-language').value = room.cookLanguage || '';
     document.getElementById('cook-name').value = room.cookName || '';
