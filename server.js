@@ -99,30 +99,6 @@ const DISH_LIBRARY = [
   { name: 'Mushroom Risotto', cuisine: 'italian', category: 'rice', diet: 'veg', mealTimes: ['lunch', 'dinner'], ingredients: ['rice', 'mushroom'], nutrition: { kcal: 380, protein: 10, carbs: 54, fat: 14 } },
 ];
 
-// diet: 'veg' | 'nonveg' (egg is treated as non-veg here)
-// mealTimes: which meals a dish suits — subset of ['breakfast','lunch','dinner']
-const SEED_DISHES = [
-  { name: 'Aloo Paratha', category: 'paratha', diet: 'veg', mealTimes: ['breakfast', 'dinner'], cookRating: 'great', ingredients: ['potato', 'wheat flour'], nutrition: { kcal: 260, protein: 6, carbs: 40, fat: 9, fiber: 4 } },
-  { name: 'Gobi Paratha', category: 'paratha', diet: 'veg', mealTimes: ['breakfast', 'dinner'], cookRating: 'okay', ingredients: ['cauliflower', 'wheat flour'], nutrition: { kcal: 240, protein: 6, carbs: 36, fat: 8, fiber: 5 } },
-  { name: 'Sattu Paratha', category: 'paratha', diet: 'veg', mealTimes: ['breakfast', 'dinner'], cookRating: 'unknown', ingredients: ['sattu', 'wheat flour'], nutrition: { kcal: 290, protein: 10, carbs: 38, fat: 10, fiber: 6 } },
-  { name: 'Chana Masala', category: 'curry', diet: 'veg', mealTimes: ['lunch', 'dinner'], cookRating: 'great', ingredients: ['chickpeas', 'onion', 'tomato'], nutrition: { kcal: 280, protein: 12, carbs: 38, fat: 9, fiber: 10 } },
-  { name: 'Paneer Butter Masala', category: 'paneer', diet: 'veg', mealTimes: ['lunch', 'dinner'], cookRating: 'great', ingredients: ['paneer', 'butter', 'tomato'], nutrition: { kcal: 400, protein: 14, carbs: 14, fat: 30, fiber: 2 } },
-  { name: 'Paneer Chilli', category: 'paneer', diet: 'veg', mealTimes: ['lunch', 'dinner'], cookRating: 'okay', ingredients: ['paneer', 'capsicum'], nutrition: { kcal: 320, protein: 16, carbs: 18, fat: 20, fiber: 3 } },
-  { name: 'Paneer Tikka Masala', category: 'paneer', diet: 'veg', mealTimes: ['lunch', 'dinner'], cookRating: 'unknown', ingredients: ['paneer', 'capsicum', 'onion'], nutrition: { kcal: 350, protein: 16, carbs: 16, fat: 24, fiber: 3 } },
-  { name: 'Mushroom Masala', category: 'curry', diet: 'veg', mealTimes: ['lunch', 'dinner'], cookRating: 'okay', ingredients: ['mushroom', 'onion', 'tomato'], nutrition: { kcal: 180, protein: 6, carbs: 14, fat: 11, fiber: 3 } },
-  { name: 'Chicken Curry', category: 'curry', diet: 'nonveg', mealTimes: ['lunch', 'dinner'], cookRating: 'great', ingredients: ['chicken', 'onion', 'tomato'], nutrition: { kcal: 330, protein: 28, carbs: 10, fat: 20, fiber: 2 } },
-  { name: 'Egg Curry', category: 'egg', diet: 'nonveg', mealTimes: ['breakfast', 'lunch', 'dinner'], cookRating: 'great', ingredients: ['egg', 'onion', 'tomato'], nutrition: { kcal: 260, protein: 16, carbs: 10, fat: 18, fiber: 2 } },
-  { name: 'Egg Biryani', category: 'egg', diet: 'nonveg', mealTimes: ['lunch', 'dinner'], cookRating: 'unknown', ingredients: ['egg', 'rice', 'spices'], nutrition: { kcal: 420, protein: 14, carbs: 60, fat: 14, fiber: 2 } },
-  // common breakfast / tiffin items
-  { name: 'Poha', category: 'breakfast', diet: 'veg', mealTimes: ['breakfast'], cookRating: 'great', ingredients: ['flattened rice', 'onion', 'peanuts'], nutrition: { kcal: 250, protein: 5, carbs: 45, fat: 6, fiber: 3 } },
-  { name: 'Upma', category: 'breakfast', diet: 'veg', mealTimes: ['breakfast'], cookRating: 'great', ingredients: ['semolina', 'onion'], nutrition: { kcal: 270, protein: 6, carbs: 40, fat: 9, fiber: 3 } },
-  { name: 'Vermicelli Upma', category: 'breakfast', diet: 'veg', mealTimes: ['breakfast'], cookRating: 'great', ingredients: ['vermicelli', 'vegetables'], nutrition: { kcal: 260, protein: 5, carbs: 42, fat: 8, fiber: 2 } },
-  { name: 'Bread Omelette', category: 'egg', diet: 'nonveg', mealTimes: ['breakfast'], cookRating: 'great', ingredients: ['egg', 'bread', 'onion'], nutrition: { kcal: 320, protein: 14, carbs: 28, fat: 17, fiber: 2 } },
-  { name: 'Dosa', category: 'breakfast', diet: 'veg', mealTimes: ['breakfast', 'dinner'], cookRating: 'great', ingredients: ['rice', 'urad dal'], nutrition: { kcal: 250, protein: 6, carbs: 40, fat: 7, fiber: 2 } },
-  { name: 'Idli', category: 'breakfast', diet: 'veg', mealTimes: ['breakfast', 'dinner'], cookRating: 'great', ingredients: ['rice', 'urad dal'], nutrition: { kcal: 180, protein: 6, carbs: 36, fat: 1, fiber: 2 } },
-  { name: 'Moong Dal Chilla', category: 'breakfast', diet: 'veg', mealTimes: ['breakfast', 'dinner'], cookRating: 'great', ingredients: ['moong dal', 'onion'], nutrition: { kcal: 220, protein: 12, carbs: 28, fat: 6, fiber: 5 } },
-  { name: 'Cheese Sandwich', category: 'breakfast', diet: 'veg', mealTimes: ['breakfast'], cookRating: 'great', ingredients: ['bread', 'cheese'], nutrition: { kcal: 350, protein: 12, carbs: 38, fat: 17, fiber: 3 } },
-];
 
 // A person's meal schedule — who is normally home for which meal.
 // Defaults to present for all meals unless a meal is explicitly false.
@@ -138,12 +114,12 @@ function createRoom(db, opts = {}) {
   const cuisines = Array.isArray(opts.cuisines) ? opts.cuisines.filter(c => CUISINES.includes(c)) : [];
   const seedFrom = cuisines.length ? DISH_LIBRARY.filter(d => cuisines.includes(d.cuisine))
                                    : DISH_LIBRARY.filter(d => d.cuisine === 'north-indian');
-  const names = Array.isArray(opts.people) ? opts.people.map(n => String(n || '').trim()).filter(Boolean) : [];
+  const names = Array.isArray(opts.people) ? opts.people.map(n => clampStr(n, LIMITS.name).trim()).filter(Boolean).slice(0, LIMITS.people) : [];
   const people = (names.length ? names : ['Me']).map((n, i) => ({ id: newId(), name: n, meals: normalizeMeals(), phone: '', joined: i === 0 }));
   db.rooms[code] = {
     code,
     createdAt: new Date().toISOString(),
-    householdName: typeof opts.householdName === 'string' ? opts.householdName.trim() : '',
+    householdName: clampStr(opts.householdName, 60).trim(),
     dietPref: ['veg', 'nonveg', 'both'].includes(opts.dietPref) ? opts.dietPref : 'both',
     cuisines,
     cookLanguage: '',
@@ -180,18 +156,29 @@ function sendJSON(res, status, obj) {
   res.end(body);
 }
 
+const MAX_BODY = 256 * 1024; // 256 KB — plenty for a room; caps memory per request
 function readBody(req) {
   return new Promise((resolve, reject) => {
-    let chunks = [];
-    req.on('data', c => chunks.push(c));
+    let chunks = [], size = 0, aborted = false;
+    req.on('data', c => {
+      if (aborted) return;
+      size += c.length;
+      if (size > MAX_BODY) { aborted = true; req.destroy(); reject(new Error('Body too large')); return; }
+      chunks.push(c);
+    });
     req.on('end', () => {
-      if (chunks.length === 0) return resolve({});
+      if (aborted || chunks.length === 0) return resolve({});
       try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8'))); }
       catch (e) { resolve({}); }
     });
     req.on('error', reject);
   });
 }
+
+// clamp helpers so stored data stays bounded
+function clampStr(s, n) { return String(s == null ? '' : s).slice(0, n); }
+function clampArr(a, n) { return Array.isArray(a) ? a.slice(0, n) : []; }
+const LIMITS = { people: 50, dishes: 1000, plan: 3000, ingredients: 40, name: 80 };
 
 const MIME = {
   '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript', '.json': 'application/json',
@@ -259,10 +246,11 @@ const server = http.createServer(async (req, res) => {
       // ---- people ----
       if (parts[3] === 'people') {
         if (req.method === 'POST' && parts.length === 4) {
+          if (room.people.length >= LIMITS.people) return sendJSON(res, 400, { error: 'Too many members in this room' });
           const body = await readBody(req);
-          const name = (body.name || '').trim();
+          const name = clampStr(body.name, LIMITS.name).trim();
           if (!name) return sendJSON(res, 400, { error: 'Name required' });
-          const person = { id: newId(), name, meals: normalizeMeals(body.meals), phone: (body.phone || '').replace(/\D/g, ''), joined: body.joined === true };
+          const person = { id: newId(), name, meals: normalizeMeals(body.meals), phone: (body.phone || '').replace(/\D/g, '').slice(0, 20), joined: body.joined === true };
           room.people.push(person);
           saveDB(db);
           return sendJSON(res, 200, person);
@@ -291,17 +279,19 @@ const server = http.createServer(async (req, res) => {
       // ---- dishes ----
       if (parts[3] === 'dishes') {
         if (req.method === 'POST' && parts.length === 4) {
+          if (room.dishes.length >= LIMITS.dishes) return sendJSON(res, 400, { error: 'Too many dishes in this room' });
           const body = await readBody(req);
-          if (!body.name) return sendJSON(res, 400, { error: 'Dish name required' });
+          const dishName = clampStr(body.name, LIMITS.name).trim();
+          if (!dishName) return sendJSON(res, 400, { error: 'Dish name required' });
           const dish = {
             id: newId(),
-            name: body.name,
-            category: body.category || 'other',
+            name: dishName,
+            category: clampStr(body.category, 20) || 'other',
             diet: body.diet === 'nonveg' ? 'nonveg' : 'veg',
             mealTimes: Array.isArray(body.mealTimes) ? body.mealTimes : [],
             cookRating: body.cookRating || 'unknown',
-            likedBy: body.likedBy || [],
-            ingredients: body.ingredients || [],
+            likedBy: clampArr(body.likedBy, LIMITS.people),
+            ingredients: clampArr(body.ingredients, LIMITS.ingredients).map(i => clampStr(i, 40)),
             nutrition: body.nutrition || null,
             timesMade: 0,
             lastMade: null,
@@ -335,6 +325,7 @@ const server = http.createServer(async (req, res) => {
       if (parts[3] === 'plan') {
         if (!room.plan) room.plan = [];
         if (req.method === 'POST' && parts.length === 4) {
+          if (room.plan.length >= LIMITS.plan) return sendJSON(res, 400, { error: 'Plan is full — clear some old entries' });
           const body = await readBody(req);
           const dish = room.dishes.find(d => d.id === body.dishId);
           if (!dish) return sendJSON(res, 404, { error: 'Dish not found' });

@@ -405,6 +405,10 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
       <input type="text" id="cook-language" placeholder="e.g. Kannada, Odia, Hindi" />
       <button class="btn" id="save-language-btn" style="width:auto;">Save</button>
     </div>
+    <div class="section-divider"></div>
+    <h2 class="section-title">Backup</h2>
+    <p class="hint">Save a copy of this room’s data (people, dishes, plan) to your device.</p>
+    <button class="btn secondary" id="backup-btn" style="width:auto;">⬇️ Download a backup</button>
   </div>
 
   <div class="panel" id="panel-plan">
@@ -627,6 +631,15 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     }
   }
   document.querySelectorAll('[data-invite]').forEach(b=>b.addEventListener('click', inviteFamily));
+  document.getElementById('backup-btn').addEventListener('click', ()=>{
+    const blob = new Blob([JSON.stringify(room, null, 2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = ((room.householdName||'aaj-kya-banwaye').replace(/[^a-z0-9]+/gi,'-')+'-'+roomCode+'.json').toLowerCase();
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+    toast('Backup downloaded ✓');
+  });
 
   // ---- welcome / claim-identity on join ----
   let welcomeClaimId = '';
