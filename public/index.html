@@ -61,6 +61,7 @@ p.tagline{margin:0 0 22px;color:var(--ink-soft);font-size:14.5px;}
 .gate-card input{width:100%;padding:11px;font-size:16px;border:1px solid var(--card-line);border-radius:8px;text-transform:uppercase;letter-spacing:1px;}
 .gate-error{color:var(--red);font-size:13px;margin-top:8px;}
 .or-sep{color:var(--ink-soft);font-size:13px;margin:14px 0;}
+.share-app-link{background:none;border:none;color:var(--ink-soft);text-decoration:underline;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif;}
 
 /* --- create-room setup wizard --- */
 #setup{max-width:440px;margin:34px auto;padding:0 20px 40px;text-align:center;}
@@ -262,6 +263,8 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
   </div>
   <div class="or-sep">or</div>
   <button class="btn secondary" id="create-btn">Create a new room</button>
+  <div style="height:20px;"></div>
+  <button class="share-app-link" data-share-app>🍲 Share this app with someone</button>
 </div>
 
 <div id="setup" style="display:none;">
@@ -381,9 +384,14 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
   </div>
 
   <div class="panel" id="panel-people">
-    <h2 class="section-title">Household members</h2>
-    <button class="btn" data-invite style="margin-bottom:8px;">🔗 Invite family to this room</button>
-    <p class="hint">Sends a link that joins this room in one tap — no code to type.</p>
+    <h2 class="section-title">Household</h2>
+    <div class="tag-input-row"><input type="text" id="household-name-input" placeholder="Household name — e.g. The Sharmas" /><button class="btn" id="save-household-btn" style="width:auto;">Save</button></div>
+    <div class="section-divider"></div>
+    <h2 class="section-title">Members</h2>
+    <button class="btn" data-invite style="margin-bottom:6px;">🔗 Invite family to this room</button>
+    <p class="hint">A one-tap link that adds them to <b>this</b> household.</p>
+    <button class="btn secondary" data-share-app style="margin-bottom:6px;">📣 Share the app with a friend</button>
+    <p class="hint">Gives them the app to start their <b>own</b> household — not this room.</p>
     <div class="person-add-row"><input type="text" id="person-name" placeholder="Add a name" /><button class="btn" id="add-person-btn" style="width:auto;">Add</button></div>
     <div id="people-list"></div>
     <div class="section-divider"></div>
@@ -631,6 +639,24 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     }
   }
   document.querySelectorAll('[data-invite]').forEach(b=>b.addEventListener('click', inviteFamily));
+  // share the APP itself (base URL, no room code) — for people to start their own household
+  function shareApp(){
+    const link = location.origin;
+    const text = 'Aaj Kya Banwaye 🍲 — decide what to cook with your family and send it to your cook. Try it:';
+    if(navigator.share){ navigator.share({ title:'Aaj Kya Banwaye', text, url:link }).catch(()=>{}); return; }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(link).then(()=>toast('App link copied ✓'))
+        .catch(()=>window.open('https://wa.me/?text='+encodeURIComponent(text+' '+link),'_blank'));
+    } else { window.open('https://wa.me/?text='+encodeURIComponent(text+' '+link),'_blank'); }
+  }
+  document.querySelectorAll('[data-share-app]').forEach(b=>b.addEventListener('click', shareApp));
+  document.getElementById('save-household-btn').addEventListener('click', async ()=>{
+    const name = document.getElementById('household-name-input').value.trim();
+    room = await api(`/room/${roomCode}`, 'PUT', {householdName:name});
+    document.getElementById('household-name-input').value = room.householdName || '';
+    document.getElementById('household-name-display').textContent = room.householdName ? room.householdName+' · ' : '';
+    toast(room.householdName ? 'Household name saved ✓' : 'Name cleared');
+  });
   document.getElementById('backup-btn').addEventListener('click', ()=>{
     const blob = new Blob([JSON.stringify(room, null, 2)], {type:'application/json'});
     const a = document.createElement('a');
@@ -1574,6 +1600,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     renderCategoryFilter(); renderDishDietFilter(); renderDishList(); renderDishSuggestions();
     renderPeopleList();
     document.getElementById('household-name-display').textContent = room.householdName ? room.householdName+' · ' : '';
+    document.getElementById('household-name-input').value = room.householdName || '';
     document.getElementById('cook-language').value = room.cookLanguage || '';
     document.getElementById('cook-name').value = room.cookName || '';
     document.getElementById('cook-phone').value = room.cookPhone || '';
