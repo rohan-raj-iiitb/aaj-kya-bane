@@ -49,6 +49,8 @@ h1{font-family:Georgia,serif;font-weight:600;font-size:24px;margin:0 0 2px;}
   <div class="grid" id="tiles"></div>
   <div class="section"><h2>New households · last 14 days</h2><div id="perday"></div></div>
   <div class="section"><h2>Cuisines chosen</h2><div id="cuisines"></div></div>
+  <div class="section"><h2>Library · meals by cuisine</h2><div id="library"></div></div>
+  <div class="section"><h2>Added by users · not in our library</h2><div id="custom"></div></div>
   <div class="section"><h2>Households · manage</h2>
     <div id="cleanhint" style="margin-bottom:10px;"></div>
     <div id="rooms"></div>
@@ -61,6 +63,7 @@ h1{font-family:Georgia,serif;font-weight:600;font-size:24px;margin:0 0 2px;}
   const params = new URLSearchParams(location.search);
   let key = params.get('key') || '';
   const $ = id => document.getElementById(id);
+  const esc = s => String(s==null?'':s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   function tile(n, l, hero){ return `<div class="tile ${hero?'hero':''}"><div class="n">${n}</div><div class="l">${l}</div></div>`; }
   async function load(){
     try{
@@ -80,7 +83,9 @@ h1{font-family:Georgia,serif;font-weight:600;font-size:24px;margin:0 0 2px;}
         tile(s.joinedMembers + ' / ' + s.totalMembers, 'Members joined') +
         tile(s.plan.made, 'Meals cooked (logged)') +
         tile(s.plan.proposed + s.plan.agreed + s.plan.made, 'Meals decided') +
-        tile(s.totalDishes, 'Dishes across rooms');
+        tile(s.totalDishes, 'Dishes across rooms') +
+        tile(s.library ? s.library.total : '—', 'Meals in library') +
+        tile((s.customDishes||[]).length, 'User-added · not in library');
       // per-day bars
       const days = [];
       for(let i=13;i>=0;i--){ const d=new Date(s.generatedAt); d.setDate(d.getDate()-i); days.push(d.toISOString().slice(0,10)); }
@@ -92,6 +97,13 @@ h1{font-family:Georgia,serif;font-weight:600;font-size:24px;margin:0 0 2px;}
       // cuisines
       const cz = Object.entries(s.cuisines).sort((a,b)=>b[1]-a[1]);
       $('cuisines').innerHTML = cz.length ? cz.map(([c,n])=>`<div class="row"><span>${c.replace(/-/g,' ')}</span><span>${n}</span></div>`).join('') : '<span class="muted">No cuisine data yet.</span>';
+      const lib = (s.library && s.library.byCuisine) || {};
+      $('library').innerHTML = Object.entries(lib).sort((a,b)=>b[1]-a[1]).map(([c,n])=>`<div class="row"><span>${c.replace(/-/g,' ')}</span><span>${n}</span></div>`).join('')
+        + `<div class="row"><span><b>Total meals available</b></span><span><b>${s.library?s.library.total:0}</b></span></div>`;
+      const custom = s.customDishes || [];
+      $('custom').innerHTML = custom.length
+        ? custom.map(d=>`<div class="row"><span>${esc(d.name)}</span><span>${d.count} ${d.count>1?'households':'household'}</span></div>`).join('')
+        : '<span class="muted">No user-added dishes yet — everyone’s using the built-in library.</span>';
       loadRooms();
     }catch(e){
       $('board').style.display='none'; $('gate').style.display='block';
@@ -110,7 +122,7 @@ h1{font-family:Georgia,serif;font-weight:600;font-size:24px;margin:0 0 2px;}
     $('rooms').innerHTML = rooms.map(r=>{
       const d = (r.createdAt||'').slice(0,10);
       const empty = !r.activated && d < today;
-      const name = r.householdName ? r.householdName : '(no name)';
+      const name = r.householdName ? esc(r.householdName) : '(no name)';
       return `<div class="row">
         <span>${r.activated?'✅':'⚪'} <b>${name}</b> <span class="muted">· ${r.code} · ${d}</span><br>
           <span class="muted">${r.members} members · ${r.dishes} dishes · plan ${r.plan} · made ${r.mealsMade}${empty?' · looks empty':''}</span></span>

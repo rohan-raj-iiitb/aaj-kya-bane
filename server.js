@@ -168,6 +168,11 @@ function computeStats(db) {
   let proposed = 0, agreed = 0, made = 0;
   const cuisines = {}, newRoomsPerDay = {};
   const cohort = []; // rooms created >= 7 days ago: was each active in the last 7 days?
+  // what the library offers, and which dishes users added that aren't in it
+  const libraryByCuisine = {};
+  DISH_LIBRARY.forEach(d => { libraryByCuisine[d.cuisine] = (libraryByCuisine[d.cuisine] || 0) + 1; });
+  const libraryNames = new Set(DISH_LIBRARY.map(d => d.name.trim().toLowerCase()));
+  const customDishes = {}; // nameLower -> { name, count } (dishes not in the library)
   rooms.forEach(r => {
     const created = parse(r.createdAt);
     const lastActive = parse(r.lastActiveAt) || created;
@@ -182,7 +187,14 @@ function computeStats(db) {
     if (created && daysAgo(created) >= 7) cohort.push(daysAgo(lastActive) <= 7);
     if (isActivated(r)) activatedRooms++;
     (r.people || []).forEach(p => { totalMembers++; if (p.joined) joinedMembers++; });
-    (r.dishes || []).forEach(d => { totalDishes++; mealsMade += (d.timesMade || 0); });
+    (r.dishes || []).forEach(d => {
+      totalDishes++; mealsMade += (d.timesMade || 0);
+      const key = (d.name || '').trim().toLowerCase();
+      if (key && !libraryNames.has(key)) {
+        if (!customDishes[key]) customDishes[key] = { name: (d.name || '').trim(), count: 0 };
+        customDishes[key].count++;
+      }
+    });
     (r.plan || []).forEach(p => { const s = p.status || 'agreed'; if (s === 'made') made++; else if (s === 'agreed') agreed++; else proposed++; });
     (r.cuisines || []).forEach(c => { cuisines[c] = (cuisines[c] || 0) + 1; });
   });
@@ -198,6 +210,8 @@ function computeStats(db) {
     totalDishes, mealsMade,
     plan: { proposed, agreed, made },
     cuisines, newRoomsPerDay,
+    library: { total: DISH_LIBRARY.length, byCuisine: libraryByCuisine },
+    customDishes: Object.values(customDishes).sort((a, b) => b.count - a.count),
   };
 }
 
