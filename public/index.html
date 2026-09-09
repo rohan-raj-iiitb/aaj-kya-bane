@@ -192,6 +192,13 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
 #welcome-box .chip-row{justify-content:center;margin:12px 0;}
 #welcome-box input{width:100%;}
 #welcome-box .btn{width:100%;}
+#catchup-backdrop{position:fixed;inset:0;background:rgba(43,29,20,.5);display:none;align-items:center;justify-content:center;z-index:75;padding:20px;}
+#catchup-backdrop.show{display:flex;}
+#catchup-box{background:var(--bg);border:1px solid var(--card-line);border-radius:14px;padding:22px;max-width:400px;width:100%;text-align:center;box-shadow:0 14px 48px rgba(0,0,0,.3);max-height:80vh;overflow:auto;}
+#catchup-box h2{font-family:'Fraunces',serif;font-size:21px;margin-bottom:4px;}
+.catchup-row{display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;padding:10px 0;border-bottom:1px solid var(--card-line);}
+.catchup-row:last-child{border-bottom:none;}
+.catchup-btns{display:flex;gap:6px;flex:none;}
 #ios-install-hint{position:fixed;left:12px;right:12px;bottom:calc(80px + env(safe-area-inset-bottom));background:var(--ink);color:var(--white);padding:12px 40px 12px 16px;border-radius:12px;font-size:13.5px;line-height:1.45;box-shadow:0 8px 28px rgba(0,0,0,.28);z-index:65;display:none;}
 #ios-install-hint.show{display:block;}
 #ios-install-hint b{color:var(--gold-soft);}
@@ -241,6 +248,15 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
     <input type="text" id="welcome-phone" placeholder="Your WhatsApp number (optional)" inputmode="tel" style="margin-top:8px;" />
     <button class="btn" id="welcome-join" style="margin-top:14px;">Join the kitchen</button>
     <button class="btn secondary" id="welcome-skip" style="margin-top:8px;">Skip for now</button>
+  </div>
+</div>
+<div id="catchup-backdrop">
+  <div id="catchup-box">
+    <div class="welcome-logo">🍲</div>
+    <h2>Did these get made?</h2>
+    <p class="hint">A few planned meals from earlier weren’t marked. Quick check:</p>
+    <div id="catchup-list"></div>
+    <button class="btn secondary" id="catchup-close" style="width:100%;margin-top:12px;">Done</button>
   </div>
 </div>
 <div id="confirm-backdrop">
@@ -507,6 +523,21 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
     const hay = dishHaystack(d);
     return todayIngredients.some(ing=>{ const t=normTerm(ing); return t && (hay.includes(t) || hay.includes(ing.toLowerCase())); });
   }
+  // most recent time this dish was made (with the meal, when we know it)
+  function lastMadeInfo(d){
+    let best = null;
+    (room.plan||[]).forEach(p=>{ if(p.dishId===d.id && p.status==='made'){ if(!best || p.date>best.date) best=p; } });
+    if(best) return { date:best.date, meal:best.meal };
+    if(d.lastMade) return { date:d.lastMade, meal:null };
+    return null;
+  }
+  function recencyText(d){
+    const info = lastMadeInfo(d);
+    if(!info) return '';
+    const n = daysSince(info.date);
+    const when = n<=0 ? 'today' : n===1 ? 'yesterday' : n+' days ago';
+    return 'made '+when+(info.meal ? ' · '+info.meal : '');
+  }
   function isoForOffset(n){
     const d = new Date(); d.setDate(d.getDate()+n);
     const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), da=String(d.getDate()).padStart(2,'0');
@@ -584,6 +615,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
       autoSelectPeopleForMeal();
       renderAll();
       maybeShowWelcome();
+      maybeShowCatchUp();
       return true;
     }catch(e){
       return false;
@@ -746,6 +778,59 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
     localStorage.setItem('aajkyabane-claimed-'+roomCode, 'skipped');
     document.getElementById('welcome-backdrop').classList.remove('show');
   });
+
+  // ---- catch-up: ask about planned meals from earlier that were never marked made ----
+  let _catchupShown = false;
+  function agoLabel(date){
+    const n = daysSince(date);
+    return n===1 ? 'yesterday' : n+' days ago';
+  }
+  function maybeShowCatchUp(){
+    if(_catchupShown || !myId) return;                 // identified users only; once per load
+    const today = isoForOffset(0), min = isoForOffset(-7);
+    const items = (room.plan||[]).filter(p => (p.status||'agreed')!=='made' && p.date < today && p.date >= min);
+    if(!items.length) return;
+    _catchupShown = true;
+    renderCatchUp(items);
+    document.getElementById('catchup-backdrop').classList.add('show');
+  }
+  function renderCatchUp(items){
+    const el = document.getElementById('catchup-list');
+    el.innerHTML = items.map(p=>{
+      const dish = room.dishes.find(d=>d.id===p.dishId);
+      return `<div class="catchup-row" data-cu="${p.id}">
+        <div><div class="dish-row-name">${dish?dietDot(dish):''}${escapeHtml(p.dishName)}</div>
+        <div class="dish-row-meta">${agoLabel(p.date)} · ${p.meal}</div></div>
+        <div class="catchup-btns">
+          <button class="btn small" data-cu-made="${p.id}:${p.dishId}">✓ Made</button>
+          <button class="btn small secondary" data-cu-skip="${p.id}">✗ No</button>
+        </div>
+      </div>`;
+    }).join('');
+    el.querySelectorAll('[data-cu-made]').forEach(b=>b.addEventListener('click', async ()=>{
+      const [pid, did] = b.dataset.cuMade.split(':');
+      const entry = (room.plan||[]).find(p=>p.id===pid);
+      if(entry){ await api(`/room/${roomCode}/dishes/${did}`, 'PUT', {markMadeOn: entry.date});
+                 await api(`/room/${roomCode}/plan/${pid}`, 'PUT', {status:'made'}); }
+      room = await api('/room/'+roomCode, 'GET');
+      finishCatchRow(pid);
+    }));
+    el.querySelectorAll('[data-cu-skip]').forEach(b=>b.addEventListener('click', async ()=>{
+      await api(`/room/${roomCode}/plan/${b.dataset.cuSkip}`, 'DELETE');
+      room = await api('/room/'+roomCode, 'GET');
+      finishCatchRow(b.dataset.cuSkip);
+    }));
+  }
+  function finishCatchRow(pid){
+    const row = document.querySelector('.catchup-row[data-cu="'+pid+'"]');
+    if(row) row.remove();
+    renderPlan(); renderPicks();
+    if(!document.querySelectorAll('.catchup-row').length){
+      document.getElementById('catchup-backdrop').classList.remove('show');
+      toast('Thanks — updated ✓');
+    }
+  }
+  document.getElementById('catchup-close').addEventListener('click', ()=>document.getElementById('catchup-backdrop').classList.remove('show'));
   document.getElementById('decide-btn').addEventListener('click', decideForMe);
   document.getElementById('me-select').addEventListener('change', e=>{
     myId = e.target.value;
@@ -1193,7 +1278,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
     return `<div class="pick-card ${d.cookRating}${chosen?' chosen':''}">
       <div class="pick-top">
         <div><div class="pick-name">${dietDot(d)}${escapeHtml(d.name)}</div>
-        <div class="pick-meta">${likedNames.length? 'Liked by '+likedNames.map(escapeHtml).join(', ') : 'No one tagged yet'}${d.lastMade? ' · last made '+daysSince(d.lastMade)+'d ago' : ''}</div>
+        <div class="pick-meta">${likedNames.length? 'Liked by '+likedNames.map(escapeHtml).join(', ') : 'No one tagged yet'}${recencyText(d)? ' · '+recencyText(d) : ''}</div>
         ${mealTags?`<div style="margin-top:6px;">${mealTags}</div>`:''}</div>
         <span class="badge ${d.cookRating}">${RATING_LABEL[d.cookRating]}</span>
       </div>

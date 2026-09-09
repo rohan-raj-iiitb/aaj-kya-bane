@@ -409,6 +409,11 @@ const server = http.createServer(async (req, res) => {
             dish.timesMade = (dish.timesMade || 0) + 1;
             dish.lastMade = new Date().toISOString().slice(0, 10);
           }
+          // mark made on a specific past date (catch-up for forgotten meals)
+          if (typeof body.markMadeOn === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.markMadeOn)) {
+            dish.timesMade = (dish.timesMade || 0) + 1;
+            if (!dish.lastMade || body.markMadeOn > dish.lastMade) dish.lastMade = body.markMadeOn;
+          }
           ['name', 'category', 'diet', 'mealTimes', 'cookRating', 'likedBy', 'ingredients', 'nutrition'].forEach(k => {
             if (body[k] !== undefined) dish[k] = body[k];
           });
