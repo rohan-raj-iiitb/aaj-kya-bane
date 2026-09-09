@@ -139,7 +139,7 @@ function createRoom(db, opts = {}) {
   const seedFrom = cuisines.length ? DISH_LIBRARY.filter(d => cuisines.includes(d.cuisine))
                                    : DISH_LIBRARY.filter(d => d.cuisine === 'north-indian');
   const names = Array.isArray(opts.people) ? opts.people.map(n => String(n || '').trim()).filter(Boolean) : [];
-  const people = (names.length ? names : ['Me']).map(n => ({ id: newId(), name: n, meals: normalizeMeals(), phone: '' }));
+  const people = (names.length ? names : ['Me']).map((n, i) => ({ id: newId(), name: n, meals: normalizeMeals(), phone: '', joined: i === 0 }));
   db.rooms[code] = {
     code,
     createdAt: new Date().toISOString(),
@@ -262,7 +262,7 @@ const server = http.createServer(async (req, res) => {
           const body = await readBody(req);
           const name = (body.name || '').trim();
           if (!name) return sendJSON(res, 400, { error: 'Name required' });
-          const person = { id: newId(), name, meals: normalizeMeals(body.meals), phone: (body.phone || '').replace(/\D/g, '') };
+          const person = { id: newId(), name, meals: normalizeMeals(body.meals), phone: (body.phone || '').replace(/\D/g, ''), joined: body.joined === true };
           room.people.push(person);
           saveDB(db);
           return sendJSON(res, 200, person);
@@ -275,6 +275,7 @@ const server = http.createServer(async (req, res) => {
           if (typeof body.name === 'string' && body.name.trim()) person.name = body.name.trim();
           if (body.meals) person.meals = normalizeMeals(body.meals);
           if (typeof body.phone === 'string') person.phone = body.phone.replace(/\D/g, '');
+          if (typeof body.joined === 'boolean') person.joined = body.joined;
           saveDB(db);
           return sendJSON(res, 200, person);
         }
