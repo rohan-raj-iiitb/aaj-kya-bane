@@ -147,12 +147,23 @@ function createRoom(db, opts = {}) {
 }
 
 // ---------- analytics (aggregates only, no names/numbers) ----------
+// "activated" = the household actually did something, not just created & abandoned
+function isActivated(r) {
+  const madeSum = (r.dishes || []).reduce((a, d) => a + (d.timesMade || 0), 0);
+  return !!r.householdName
+    || (Array.isArray(r.cuisines) && r.cuisines.length > 0)
+    || (r.people || []).length > 1                       // added a member
+    || (r.people || []).filter(p => p.joined).length > 1 // someone beyond the auto-joined creator
+    || (r.plan || []).length > 0
+    || madeSum > 0
+    || !!r.cookName || !!r.cookPhone;
+}
 function computeStats(db) {
   const rooms = Object.values(db.rooms || {});
   const now = Date.now();
   const daysAgo = ms => (now - ms) / 86400000;
   const parse = s => (s ? Date.parse(s) : 0);
-  let active7 = 0, active30 = 0, new7 = 0, new30 = 0;
+  let active7 = 0, active30 = 0, new7 = 0, new30 = 0, activatedRooms = 0;
   let totalMembers = 0, joinedMembers = 0, totalDishes = 0, mealsMade = 0;
   let proposed = 0, agreed = 0, made = 0;
   const cuisines = {}, newRoomsPerDay = {};
@@ -169,6 +180,7 @@ function computeStats(db) {
       newRoomsPerDay[d] = (newRoomsPerDay[d] || 0) + 1;
     }
     if (created && daysAgo(created) >= 7) cohort.push(daysAgo(lastActive) <= 7);
+    if (isActivated(r)) activatedRooms++;
     (r.people || []).forEach(p => { totalMembers++; if (p.joined) joinedMembers++; });
     (r.dishes || []).forEach(d => { totalDishes++; mealsMade += (d.timesMade || 0); });
     (r.plan || []).forEach(p => { const s = p.status || 'agreed'; if (s === 'made') made++; else if (s === 'agreed') agreed++; else proposed++; });
@@ -178,6 +190,7 @@ function computeStats(db) {
   return {
     generatedAt: new Date().toISOString(),
     totalRooms: rooms.length,
+    activatedRooms,
     newRoomsLast7: new7, newRoomsLast30: new30,
     activeLast7: active7, activeLast30: active30,
     weekRetentionPct, cohortSize: cohort.length,
@@ -275,6 +288,29 @@ const server = http.createServer(async (req, res) => {
       const q = new URLSearchParams((req.url.split('?')[1]) || '');
       if (q.get('key') !== process.env.STATS_KEY) return sendJSON(res, 403, { error: 'Forbidden' });
       return sendJSON(res, 200, computeStats(db));
+    }
+
+    // admin (same STATS_KEY): list + delete rooms, for cleaning up test data
+    if (parts[1] === 'admin') {
+      if (!process.env.STATS_KEY) return sendJSON(res, 404, { error: 'Not found' });
+      const q = new URLSearchParams((req.url.split('?')[1]) || '');
+      if (q.get('key') !== process.env.STATS_KEY) return sendJSON(res, 403, { error: 'Forbidden' });
+      if (req.method === 'GET' && parts.length === 3 && parts[2] === 'rooms') {
+        const list = Object.values(db.rooms).map(r => ({
+          code: r.code, createdAt: r.createdAt, lastActiveAt: r.lastActiveAt || null,
+          householdName: r.householdName || '', cuisines: r.cuisines || [],
+          members: (r.people || []).length, joined: (r.people || []).filter(p => p.joined).length,
+          dishes: (r.dishes || []).length, plan: (r.plan || []).length,
+          mealsMade: (r.dishes || []).reduce((a, d) => a + (d.timesMade || 0), 0),
+          activated: isActivated(r),
+        })).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+        return sendJSON(res, 200, list);
+      }
+      if (req.method === 'DELETE' && parts.length === 4 && parts[2] === 'room') {
+        const code = parts[3];
+        if (db.rooms[code]) { delete db.rooms[code]; saveDB(db); return sendJSON(res, 200, { ok: true, deleted: code }); }
+        return sendJSON(res, 404, { error: 'Room not found' });
+      }
     }
 
     // room-scoped routes need a valid room
