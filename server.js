@@ -146,6 +146,48 @@ function createRoom(db, opts = {}) {
   return db.rooms[code];
 }
 
+// ---------- analytics (aggregates only, no names/numbers) ----------
+function computeStats(db) {
+  const rooms = Object.values(db.rooms || {});
+  const now = Date.now();
+  const daysAgo = ms => (now - ms) / 86400000;
+  const parse = s => (s ? Date.parse(s) : 0);
+  let active7 = 0, active30 = 0, new7 = 0, new30 = 0;
+  let totalMembers = 0, joinedMembers = 0, totalDishes = 0, mealsMade = 0;
+  let proposed = 0, agreed = 0, made = 0;
+  const cuisines = {}, newRoomsPerDay = {};
+  const cohort = []; // rooms created >= 7 days ago: was each active in the last 7 days?
+  rooms.forEach(r => {
+    const created = parse(r.createdAt);
+    const lastActive = parse(r.lastActiveAt) || created;
+    if (daysAgo(lastActive) <= 7) active7++;
+    if (daysAgo(lastActive) <= 30) active30++;
+    if (created && daysAgo(created) <= 7) new7++;
+    if (created && daysAgo(created) <= 30) new30++;
+    if (created && daysAgo(created) <= 14) {
+      const d = new Date(created).toISOString().slice(0, 10);
+      newRoomsPerDay[d] = (newRoomsPerDay[d] || 0) + 1;
+    }
+    if (created && daysAgo(created) >= 7) cohort.push(daysAgo(lastActive) <= 7);
+    (r.people || []).forEach(p => { totalMembers++; if (p.joined) joinedMembers++; });
+    (r.dishes || []).forEach(d => { totalDishes++; mealsMade += (d.timesMade || 0); });
+    (r.plan || []).forEach(p => { const s = p.status || 'agreed'; if (s === 'made') made++; else if (s === 'agreed') agreed++; else proposed++; });
+    (r.cuisines || []).forEach(c => { cuisines[c] = (cuisines[c] || 0) + 1; });
+  });
+  const weekRetentionPct = cohort.length ? Math.round(100 * cohort.filter(Boolean).length / cohort.length) : null;
+  return {
+    generatedAt: new Date().toISOString(),
+    totalRooms: rooms.length,
+    newRoomsLast7: new7, newRoomsLast30: new30,
+    activeLast7: active7, activeLast30: active30,
+    weekRetentionPct, cohortSize: cohort.length,
+    totalMembers, joinedMembers,
+    totalDishes, mealsMade,
+    plan: { proposed, agreed, made },
+    cuisines, newRoomsPerDay,
+  };
+}
+
 // ---------- HTTP helpers ----------
 function sendJSON(res, status, obj) {
   const body = JSON.stringify(obj);
@@ -227,10 +269,19 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, room);
     }
 
+    // GET /api/stats?key=... -> private aggregate metrics (only if STATS_KEY is set)
+    if (req.method === 'GET' && parts.length === 2 && parts[1] === 'stats') {
+      if (!process.env.STATS_KEY) return sendJSON(res, 404, { error: 'Not found' });
+      const q = new URLSearchParams((req.url.split('?')[1]) || '');
+      if (q.get('key') !== process.env.STATS_KEY) return sendJSON(res, 403, { error: 'Forbidden' });
+      return sendJSON(res, 200, computeStats(db));
+    }
+
     // room-scoped routes need a valid room
     if (parts[1] === 'room' && parts.length >= 3) {
       const room = db.rooms[parts[2]];
       if (!room) return sendJSON(res, 404, { error: 'Room not found. Check the code.' });
+      if (req.method !== 'GET') room.lastActiveAt = new Date().toISOString(); // activity signal for retention
 
       // PUT /api/room/:code -> update room-level settings (e.g. cookLanguage)
       if (req.method === 'PUT' && parts.length === 3) {
