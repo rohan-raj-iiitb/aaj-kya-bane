@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="Aaj Kya Banwaye" />
+<meta name="apple-mobile-web-app-title" content="Kya Banwaye" />
 <link rel="manifest" href="/manifest.webmanifest" />
 <meta name="theme-color" content="#C08415" />
 <link rel="icon" href="/icon.svg" type="image/svg+xml" />
@@ -34,7 +34,7 @@ body{
 
 /* branded top header */
 #app-header{position:sticky;top:0;z-index:40;background:var(--ink);border-bottom:2px solid var(--gold);}
-.header-inner{max-width:640px;margin:0 auto;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;}
+.header-inner{max-width:640px;margin:0 auto;padding:12px 18px;display:flex;align-items:center;justify-content:center;}
 .brand{display:flex;align-items:center;gap:9px;font-family:'Fraunces',serif;font-weight:600;font-size:20px;letter-spacing:-0.01em;color:var(--bg);}
 .brand-logo{font-size:21px;line-height:1;}
 
@@ -170,6 +170,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
 #ios-install-hint b{color:var(--gold-soft);}
 #ios-hint-x{position:absolute;top:6px;right:10px;cursor:pointer;font-size:16px;opacity:.85;padding:4px;}
 
+.add-dish-toggle{margin-bottom:18px;}
 /* inline cook-rating editor on each dish row */
 .dish-edit{display:flex;align-items:center;gap:8px;margin-top:8px;}
 .dish-edit-label{font-size:11.5px;color:var(--ink-soft);}
@@ -267,11 +268,14 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
       <div id="fresh-matches"></div>
       <div class="filter-row" id="picks-diet-filter"></div>
       <div id="picks-list"></div>
+      <div id="picks-more"></div>
     </div>
   </div>
 
   <div class="panel" id="panel-dishes">
-    <h2 class="section-title" id="dish-form-title">Add a dish</h2>
+    <button class="btn add-dish-toggle" id="add-dish-toggle">➕ Add a dish</button>
+    <div id="add-dish-section" style="display:none;">
+    <h2 class="section-title" id="dish-form-title" style="margin-top:4px;">Add a dish</h2>
     <div id="dish-suggestions"></div>
     <div class="dish-form">
       <div class="field"><label>Dish name</label><input type="text" id="dish-name" placeholder="e.g. Paneer Tikka Masala" /></div>
@@ -314,6 +318,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
       </div>
       <button class="btn" id="save-dish-btn" style="margin-top:6px;">Add dish</button>
       <button class="btn secondary" id="cancel-edit-btn" style="margin-top:6px;display:none;">Cancel edit</button>
+    </div>
     </div>
     <h2 class="section-title">Your dish list</h2>
     <div class="filter-row" id="dish-category-filter"></div>
@@ -586,7 +591,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     el.innerHTML = days.map(([v,l])=>`<button class="chip ${selectedDay===v?'on':''}" data-day="${v}">${l}</button>`).join('');
     el.querySelectorAll('[data-day]').forEach(b=>b.addEventListener('click', ()=>{
       selectedDay = b.dataset.day;
-      decidedId = null; replacingPlanId = null;
+      decidedId = null; replacingPlanId = null; picksExpanded = false;
       renderDayTabs(); renderNowBar(); renderPlan(); renderPicks(); renderDecideResult();
     }));
   }
@@ -595,7 +600,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     el.innerHTML = MEALS.map(m=>`<button class="chip ${selectedMeal===m?'on':''}" data-meal="${m}">${m}</button>`).join('');
     el.querySelectorAll('[data-meal]').forEach(b=>b.addEventListener('click', ()=>{
       selectedMeal = b.dataset.meal;
-      decidedId = null; replacingPlanId = null;
+      decidedId = null; replacingPlanId = null; picksExpanded = false;
       autoSelectPeopleForMeal();
       renderMealTabs(); renderNowBar(); renderTodayPeoplePicker(); renderPlan(); renderPicks(); renderDecideResult();
     }));
@@ -1016,14 +1021,22 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     el.innerHTML = `<div class="fresh-label">Uses what’s fresh (${todayIngredients.map(escapeHtml).join(', ')})</div>` + pool.map(d=>pickCardHtml(d, false)).join('');
     bindPickActions(el);
   }
+  let picksExpanded = false;
   function renderPicks(){
     renderFreshMatches();
     const list = document.getElementById('picks-list');
+    const moreWrap = document.getElementById('picks-more');
+    moreWrap.innerHTML = '';
     if(room.dishes.length===0){ list.innerHTML = '<div class="empty">Add a few dishes in the Dishes tab to get suggestions.</div>'; return; }
-    const ranked = rankedPool(6);
-    if(ranked.length===0){ list.innerHTML = `<div class="empty">No ${picksDietFilter!=='all'?picksDietFilter+' ':''}dishes tagged for ${selectedMeal} yet. Tag some in the Dishes tab.</div>`; return; }
-    list.innerHTML = ranked.map(({d})=>pickCardHtml(d, false)).join('');
+    const all = rankedPool();
+    if(all.length===0){ list.innerHTML = `<div class="empty">No ${picksDietFilter!=='all'?picksDietFilter+' ':''}dishes tagged for ${selectedMeal} yet. Tag some in the Dishes tab.</div>`; return; }
+    const shown = picksExpanded ? all : all.slice(0, 6);
+    list.innerHTML = shown.map(({d})=>pickCardHtml(d, false)).join('');
     bindPickActions(list);
+    if(all.length > 6){
+      moreWrap.innerHTML = `<button class="btn secondary" id="picks-more-btn" style="margin-top:4px;">${picksExpanded ? 'Show fewer' : 'Show more ('+(all.length-6)+')'}</button>`;
+      document.getElementById('picks-more-btn').addEventListener('click', ()=>{ picksExpanded = !picksExpanded; renderPicks(); });
+    }
   }
   // ---- "Decide for me" ----
   let decidedId = null;
@@ -1169,6 +1182,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
   }
   function startEditDish(d){
     editingDishId = d.id;
+    setAddDishOpen(true);
     document.getElementById('dish-name').value = d.name;
     document.getElementById('dish-category').value = d.category || 'other';
     document.getElementById('dish-diet').value = dishDiet(d);
@@ -1197,9 +1211,19 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     document.getElementById('dish-form-title').textContent = 'Add a dish';
     document.getElementById('save-dish-btn').textContent = 'Add dish';
     document.getElementById('cancel-edit-btn').style.display = 'none';
+    setAddDishOpen(false);
     renderDishMealPicker(); renderDishPeoplePicker(); renderDishIngredientsPicker();
   }
   document.getElementById('cancel-edit-btn').addEventListener('click', resetDishForm);
+  function setAddDishOpen(open){
+    document.getElementById('add-dish-section').style.display = open ? 'block' : 'none';
+    document.getElementById('add-dish-toggle').textContent = open ? '✕ Close' : '➕ Add a dish';
+  }
+  document.getElementById('add-dish-toggle').addEventListener('click', ()=>{
+    const open = document.getElementById('add-dish-section').style.display !== 'none';
+    setAddDishOpen(!open);
+    if(!open) setTimeout(()=>document.getElementById('dish-name').focus(), 50);
+  });
   // auto-fill nutrition/category/diet/meal-times from the library when a known name is typed
   document.getElementById('dish-name').addEventListener('change', ()=>{
     if(editingDishId) return; // don't override fields while editing an existing dish
