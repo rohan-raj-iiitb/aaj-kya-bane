@@ -82,6 +82,7 @@ button.btn.small{padding:7px 12px;font-size:13px;width:auto;}
 .person-name-input:focus{border-color:var(--card-line);background:var(--white);outline:none;}
 .room-banner b{font-family:'Fraunces',serif;letter-spacing:1px;}
 .room-banner button{background:none;border:none;color:var(--ink-soft);text-decoration:underline;font-size:13px;cursor:pointer;}
+.room-banner .invite-link{color:var(--gold);font-weight:600;}
 
 .tabs{display:flex;gap:20px;border-bottom:1px solid var(--card-line);margin-bottom:20px;overflow-x:auto;}
 .tab{background:none;border:none;cursor:pointer;font-size:14.5px;font-weight:600;color:var(--ink-soft);padding:0 0 12px;position:relative;white-space:nowrap;}
@@ -270,6 +271,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
   <div class="room-banner">
     <span><span id="household-name-display"></span>Room <b id="room-code-display"></b></span>
     <span class="you-are">You’re <select id="me-select"></select></span>
+    <button class="invite-link" data-invite>Invite 🔗</button>
     <button id="leave-btn">Switch room</button>
   </div>
 
@@ -360,6 +362,8 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
 
   <div class="panel" id="panel-people">
     <h2 class="section-title">Household members</h2>
+    <button class="btn" data-invite style="margin-bottom:8px;">🔗 Invite family to this room</button>
+    <p class="hint">Sends a link that joins this room in one tap — no code to type.</p>
     <div class="person-add-row"><input type="text" id="person-name" placeholder="Add a name" /><button class="btn" id="add-person-btn" style="width:auto;">Add</button></div>
     <div id="people-list"></div>
     <div class="section-divider"></div>
@@ -589,6 +593,19 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     localStorage.removeItem('aajkyabane-room');
     location.reload();
   });
+  function inviteFamily(){
+    const link = location.origin + '/?room=' + roomCode;
+    const text = `Join ${room && room.householdName ? room.householdName+'’s' : 'our'} kitchen on Aaj Kya Banwaye 🍲 — we pick meals together here.`;
+    if(navigator.share){ navigator.share({ title:'Aaj Kya Banwaye', text, url:link }).catch(()=>{}); return; }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(link)
+        .then(()=>toast('Invite link copied ✓ — paste it to share'))
+        .catch(()=>window.open('https://wa.me/?text='+encodeURIComponent(text+' '+link),'_blank'));
+    } else {
+      window.open('https://wa.me/?text='+encodeURIComponent(text+' '+link),'_blank');
+    }
+  }
+  document.querySelectorAll('[data-invite]').forEach(b=>b.addEventListener('click', inviteFamily));
   document.getElementById('decide-btn').addEventListener('click', decideForMe);
   document.getElementById('me-select').addEventListener('change', e=>{
     myId = e.target.value;
@@ -1505,8 +1522,12 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:14px;padding:9p
     });
   }
 
-  // auto-rejoin if we have a saved room code
-  if(roomCode){ tryEnterRoom(roomCode); }
+  // invite link (?room=CODE) auto-joins that room; else auto-rejoin the saved one
+  const _invited = (new URLSearchParams(location.search).get('room') || '').trim().toUpperCase();
+  if(_invited){
+    tryEnterRoom(_invited).then(ok=>{ if(!ok && roomCode) tryEnterRoom(roomCode); });
+    history.replaceState(null, '', location.pathname);
+  } else if(roomCode){ tryEnterRoom(roomCode); }
 })();
 </script>
 </body>
