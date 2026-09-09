@@ -48,6 +48,13 @@ body{
 
 /* slim time / next-meal line + gate logo */
 .now-line{font-size:12.5px;color:var(--ink-soft);margin-bottom:14px;}
+/* pending-decision action banner */
+#action-banner{margin-bottom:6px;}
+.action-card{background:var(--gold-soft);border:1px solid var(--gold);border-left:4px solid var(--gold);border-radius:10px;padding:12px 14px;margin-bottom:10px;}
+.action-txt{font-size:14px;line-height:1.45;margin-bottom:10px;color:var(--ink);}
+.action-btns{display:flex;gap:8px;flex-wrap:wrap;}
+.navbtn .navicon{position:relative;}
+.navbtn.alert .navicon::after{content:'';position:absolute;top:-3px;right:-7px;width:9px;height:9px;background:var(--red);border-radius:50%;border:1.5px solid var(--card);}
 .gate-logo{font-size:52px;line-height:1;margin-bottom:6px;}
 h1.wordmark{font-family:'Fraunces',serif;font-weight:600;font-size:32px;margin:0 0 4px;letter-spacing:-0.01em;}
 p.tagline{margin:0 0 22px;color:var(--ink-soft);font-size:14.5px;}
@@ -332,6 +339,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
   </div>
 
   <div class="panel active" id="panel-today">
+    <div id="action-banner"></div>
     <div class="now-line" id="now-line"></div>
     <div class="meal-tabs" id="day-tabs" style="margin-bottom:8px;"></div>
     <div class="meal-tabs" id="meal-tabs"></div>
@@ -933,7 +941,50 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
     const planDishIds = new Set((room.plan||[]).filter(p=>p.date===date).map(p=>p.dishId));
     return room.dishes.filter(d=> d.lastMade===date && legacyMeal(d)===meal && !planDishIds.has(d.id));
   }
+  function dayWordForDate(date){
+    const n = Math.round((new Date(date) - new Date(isoForOffset(0))) / 86400000);
+    if(n===0) return 'today'; if(n===1) return 'tomorrow';
+    const d = new Date(date), months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return d.getDate()+' '+months[d.getMonth()];
+  }
+  function pendingForMe(){ return (room.plan||[]).filter(p => p.status==='proposed' && p.proposedBy !== myId); }
+  function renderActionBanner(){
+    const el = document.getElementById('action-banner');
+    const items = pendingForMe();
+    const todayNav = document.querySelector('.navbtn[data-tab="today"]');
+    if(todayNav) todayNav.classList.toggle('alert', items.length > 0);
+    if(!items.length){ el.innerHTML=''; return; }
+    el.innerHTML = items.map(p=>{
+      const proposer = room.people.find(x=>x.id===p.proposedBy);
+      return `<div class="action-card">
+        <div class="action-txt">🔔 <b>${proposer?escapeHtml(proposer.name):'Someone'}</b> is proposing <b>${escapeHtml(p.dishName)}</b> for ${dayWordForDate(p.date)}’s ${p.meal}. Your call:</div>
+        <div class="action-btns">
+          <button class="btn small" data-ab-agree="${p.id}">✓ Agree</button>
+          <button class="btn small secondary" data-ab-swap="${p.id}">Suggest instead</button>
+        </div>
+      </div>`;
+    }).join('');
+    el.querySelectorAll('[data-ab-agree]').forEach(b=>b.addEventListener('click', async ()=>{
+      await api(`/room/${roomCode}/plan/${b.dataset.abAgree}`, 'PUT', {status:'agreed'});
+      room = await api('/room/'+roomCode, 'GET');
+      toast('Agreed ✅ — you can send it to the cook now');
+      renderPlan(); renderPicks(); renderDecideResult();
+    }));
+    el.querySelectorAll('[data-ab-swap]').forEach(b=>b.addEventListener('click', ()=>{
+      const p = (room.plan||[]).find(x=>x.id===b.dataset.abSwap);
+      if(!p) return;
+      const n = Math.round((new Date(p.date) - new Date(isoForOffset(0))) / 86400000);
+      selectedDay = n===1 ? 'tomorrow' : 'today';
+      selectedMeal = p.meal;
+      replacingPlanId = p.id;
+      autoSelectPeopleForMeal();
+      renderDayTabs(); renderMealTabs(); renderNowBar(); renderTodayPeoplePicker(); renderPlan(); renderPicks(); renderDecideResult();
+      const inp = document.getElementById('dish-search'); inp.scrollIntoView({behavior:'smooth', block:'center'}); inp.focus();
+      toast('Pick a replacement — it’ll swap out '+p.dishName);
+    }));
+  }
   function renderPlan(){
+    renderActionBanner();
     const dayWord = selectedDay==='tomorrow' ? 'tomorrow' : 'today';
     document.getElementById('plan-title').textContent = `Deciding for ${dayWord}’s ${selectedMeal}`;
     const box = document.getElementById('plan-box');
@@ -1298,7 +1349,8 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
     const meName = (room.people.find(p=>p.id===myId)||{}).name;
     const whenWord = selectedDay==='tomorrow' ? 'tomorrow' : 'today';
     const intro = meName ? `${meName} here — ` : '';
-    const msg = `${intro}thinking of ${dish.name} for ${whenWord}'s ${selectedMeal}. Same for you, or something else in mind? Open the app to agree or suggest: ${location.origin}`;
+    const deepLink = `${location.origin}/?room=${roomCode}&meal=${selectedMeal}&day=${selectedDay}`;
+    const msg = `${intro}thinking of ${dish.name} for ${whenWord}'s ${selectedMeal}. Same for you, or something else in mind? Open the app to agree or suggest: ${deepLink}`;
     const withPhone = otherMembers().filter(p=>p.phone);
     const base = withPhone.length===1 ? 'https://wa.me/'+withPhone[0].phone+'?text=' : 'https://wa.me/?text=';
     window.open(base + encodeURIComponent(msg), '_blank');
@@ -1753,8 +1805,12 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
     });
   }
 
+  // deep-link params: a proposal link can point at a specific meal/day
+  const _params = new URLSearchParams(location.search);
+  if(MEALS.includes(_params.get('meal'))) selectedMeal = _params.get('meal');
+  if(_params.get('day')==='today' || _params.get('day')==='tomorrow') selectedDay = _params.get('day');
   // invite link (?room=CODE) auto-joins that room; else auto-rejoin the saved one
-  const _invited = (new URLSearchParams(location.search).get('room') || '').trim().toUpperCase();
+  const _invited = (_params.get('room') || '').trim().toUpperCase();
   if(_invited){
     tryEnterRoom(_invited).then(ok=>{ if(!ok && roomCode) tryEnterRoom(roomCode); });
     history.replaceState(null, '', location.pathname);
