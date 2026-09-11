@@ -48,6 +48,8 @@ body{
 
 /* slim time / next-meal line + gate logo */
 .now-line{font-size:12.5px;color:var(--ink-soft);margin-bottom:14px;}
+#shop-hook{width:100%;text-align:left;background:var(--gold-soft);border:1px solid var(--gold);border-radius:10px;padding:11px 14px;font-size:13.5px;font-weight:600;color:#7A5610;cursor:pointer;margin-bottom:16px;font-family:'Inter',sans-serif;justify-content:space-between;align-items:center;}
+.more-item{width:100%;font-size:15px;padding:14px 16px;}
 /* pending-decision action banner */
 #action-banner{margin-bottom:6px;}
 .action-card{background:var(--gold-soft);border:1px solid var(--gold);border-left:4px solid var(--gold);border-radius:10px;padding:12px 14px;margin-bottom:10px;}
@@ -341,6 +343,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
   <div class="panel active" id="panel-today">
     <div id="action-banner"></div>
     <div class="now-line" id="now-line"></div>
+    <button id="shop-hook" style="display:none;"></button>
     <div class="meal-tabs" id="day-tabs" style="margin-bottom:8px;"></div>
     <div class="meal-tabs" id="meal-tabs"></div>
 
@@ -464,10 +467,19 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
     <h2 class="section-title">Plan the week</h2>
     <p class="hint">Tap ＋ to add a dish to any meal. Everything here is saved for the whole household.</p>
     <div id="week-plan"></div>
-    <div class="section-divider"></div>
-    <h2 class="section-title">Shopping list · next 7 days</h2>
-    <p class="hint">Ingredients from everything planned above. Tick items as you buy — this checklist stays on your phone.</p>
+  </div>
+
+  <div class="panel" id="panel-shopping">
+    <h2 class="section-title">🛒 Shopping list</h2>
+    <p class="hint">Everything you need for the meals planned in the next 7 days. Tick items as you buy — this checklist stays on your phone.</p>
+    <button class="btn secondary" id="copy-shopping-btn" style="width:auto;margin-bottom:14px;">Copy list</button>
     <div id="shopping-list"></div>
+  </div>
+
+  <div class="panel" id="panel-more">
+    <h2 class="section-title">More</h2>
+    <button class="btn secondary more-item" data-goto="people" style="text-align:left;margin-bottom:10px;">👥 People &amp; household</button>
+    <button class="btn secondary more-item" data-goto="week" style="text-align:left;">📊 This week</button>
   </div>
 
   <div class="panel" id="panel-week">
@@ -480,9 +492,9 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
 <nav id="bottom-nav" style="display:none;">
   <button class="navbtn active" data-tab="today"><span class="navicon">🍽️</span>Today</button>
   <button class="navbtn" data-tab="plan"><span class="navicon">🗓️</span>Plan</button>
+  <button class="navbtn" data-tab="shopping"><span class="navicon">🛒</span>Shopping</button>
   <button class="navbtn" data-tab="dishes"><span class="navicon">🍲</span>Dishes</button>
-  <button class="navbtn" data-tab="people"><span class="navicon">👥</span>People</button>
-  <button class="navbtn" data-tab="week"><span class="navicon">📊</span>Week</button>
+  <button class="navbtn" data-tab="more"><span class="navicon">☰</span>More</button>
 </nav>
 
 <script>
@@ -892,7 +904,25 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
       window.scrollTo(0, 0);
       if(tab.dataset.tab === 'week') renderWeek();
       if(tab.dataset.tab === 'plan') renderWeekPlan();
+      if(tab.dataset.tab === 'shopping') renderShoppingList();
     });
+  });
+  // "More" menu → open People or This week
+  document.querySelectorAll('[data-goto]').forEach(b=>b.addEventListener('click', ()=>{
+    const t = b.dataset.goto;
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    document.getElementById('panel-'+t).classList.add('active');
+    window.scrollTo(0,0);
+    if(t==='week') renderWeek();
+  }));
+  document.getElementById('shop-hook').addEventListener('click', ()=>document.querySelector('.navbtn[data-tab="shopping"]').click());
+  document.getElementById('copy-shopping-btn').addEventListener('click', ()=>{
+    const items = Object.keys(shoppingAgg()).sort();
+    if(!items.length){ toast('Nothing to buy yet'); return; }
+    const text = 'Shopping list 🛒\n' + items.map(i=>'• '+i).join('\n');
+    if(navigator.share){ navigator.share({title:'Shopping list', text}).catch(()=>{}); return; }
+    if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(()=>toast('List copied ✓')).catch(()=>toast('Copied'));
+    else toast('Copied');
   });
 
   // ---------- NOW BAR + MEAL PLANNER ----------
@@ -985,6 +1015,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
   }
   function renderPlan(){
     renderActionBanner();
+    renderShopHook();
     const dayWord = selectedDay==='tomorrow' ? 'tomorrow' : 'today';
     document.getElementById('plan-title').textContent = `Deciding for ${dayWord}’s ${selectedMeal}`;
     const box = document.getElementById('plan-box');
@@ -1144,14 +1175,25 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
     toast('Opening WhatsApp 📩');
   }
   // ---------- SHOPPING LIST ----------
-  function renderShoppingList(){
-    const el = document.getElementById('shopping-list');
+  function shoppingAgg(){
     const dates = new Set(Array.from({length:7}, (_,n)=>isoForOffset(n)));
     const counts = {};
     (room.plan||[]).filter(p=>dates.has(p.date) && p.status!=='made').forEach(p=>{
       const dish = room.dishes.find(d=>d.id===p.dishId);
       (dish?.ingredients||[]).forEach(ing=>{ const k=(ing||'').trim().toLowerCase(); if(k) counts[k]=(counts[k]||0)+1; });
     });
+    return counts;
+  }
+  function renderShopHook(){
+    const el = document.getElementById('shop-hook');
+    const n = Object.keys(shoppingAgg()).length;
+    if(!n){ el.style.display='none'; return; }
+    el.style.display='flex';
+    el.innerHTML = `<span>🛒 ${n} thing${n>1?'s':''} to buy this week</span><span>›</span>`;
+  }
+  function renderShoppingList(){
+    const el = document.getElementById('shopping-list');
+    const counts = shoppingAgg();
     const items = Object.keys(counts).sort();
     if(items.length===0){ el.innerHTML = '<div class="empty">Plan some meals above and their ingredients will appear here.</div>'; return; }
     el.innerHTML = items.map((ing,i)=>`<div class="shop-item">
