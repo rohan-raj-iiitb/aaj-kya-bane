@@ -35,8 +35,16 @@ body{
 /* branded top header */
 #app-header{position:sticky;top:0;z-index:40;background:var(--ink);border-bottom:2px solid var(--gold);padding-top:env(safe-area-inset-top);}
 .header-inner{max-width:640px;margin:0 auto;padding:12px max(18px,env(safe-area-inset-right)) 12px max(18px,env(safe-area-inset-left));display:flex;align-items:center;justify-content:center;}
-.brand{display:flex;align-items:center;gap:9px;font-family:'Fraunces',serif;font-weight:600;font-size:20px;letter-spacing:-0.01em;color:var(--bg);}
-.brand-logo{font-size:21px;line-height:1;}
+.brand{display:flex;align-items:center;gap:9px;color:var(--bg);}
+.brand-logo{font-size:22px;line-height:1;}
+.brand-text{display:flex;flex-direction:column;line-height:1.15;}
+.brand-name{font-family:'Fraunces',serif;font-weight:600;font-size:18px;letter-spacing:-0.01em;}
+.brand-house{font-family:'Inter',sans-serif;font-size:11px;font-weight:500;color:rgba(251,243,225,.72);}
+.more-you{font-size:14px;color:var(--ink-soft);margin-bottom:14px;}
+.more-you select{width:auto;}
+.more-room{font-size:13.5px;color:var(--ink-soft);margin-bottom:12px;}
+.more-room b{letter-spacing:1px;color:var(--ink);}
+.back-more{background:none;border:none;color:var(--gold);font-size:13.5px;font-weight:600;cursor:pointer;padding:0 0 12px;font-family:'Inter',sans-serif;}
 
 /* bottom tab bar */
 #bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:40;display:flex;background:var(--card);border-top:1px solid var(--card-line);padding-bottom:env(safe-area-inset-bottom);}
@@ -280,7 +288,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
 
 <header id="app-header" style="display:none;">
   <div class="header-inner">
-    <span class="brand"><span class="brand-logo">🍲</span>Aaj Kya Banwaye</span>
+    <span class="brand"><span class="brand-logo">🍲</span><span class="brand-text"><span class="brand-name">Aaj Kya Banwaye</span><span class="brand-house" id="household-name-display"></span></span></span>
   </div>
 </header>
 
@@ -325,21 +333,6 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
 </div>
 
 <div class="wrap" id="app" style="display:none;">
-  <div class="room-banner">
-    <span class="rb-left">
-      <b id="household-name-display">My household</b>
-      <span class="you-are">You’re <select id="me-select"></select></span>
-    </span>
-    <div class="rb-menu-wrap">
-      <button class="rb-menu-btn" id="rb-menu-btn" aria-label="Room menu">⋯</button>
-      <div class="rb-menu" id="rb-menu">
-        <div class="rb-menu-code">Room <b id="room-code-display"></b> <button class="rb-copy" id="copy-code-btn">copy</button></div>
-        <button class="rb-menu-item" data-invite>🔗 Invite family to this room</button>
-        <button class="rb-menu-item" id="leave-btn">Switch room</button>
-      </div>
-    </div>
-  </div>
-
   <div class="panel active" id="panel-today">
     <div id="action-banner"></div>
     <div class="now-line" id="now-line"></div>
@@ -428,6 +421,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
   </div>
 
   <div class="panel" id="panel-people">
+    <button class="back-more" data-goto="more">‹ More</button>
     <h2 class="section-title">Household</h2>
     <div class="tag-input-row"><input type="text" id="household-name-input" placeholder="Household name — e.g. The Sharmas" /><button class="btn" id="save-household-btn" style="width:auto;">Save</button></div>
     <div class="section-divider"></div>
@@ -478,11 +472,18 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
 
   <div class="panel" id="panel-more">
     <h2 class="section-title">More</h2>
+    <div class="more-you">You’re <select id="me-select"></select></div>
     <button class="btn secondary more-item" data-goto="people" style="text-align:left;margin-bottom:10px;">👥 People &amp; household</button>
     <button class="btn secondary more-item" data-goto="week" style="text-align:left;">📊 This week</button>
+    <div class="section-divider"></div>
+    <h2 class="section-title">Room</h2>
+    <div class="more-room">Code <b id="room-code-display"></b> <button class="rb-copy" id="copy-code-btn">copy</button></div>
+    <button class="btn secondary more-item" data-invite style="text-align:left;margin-bottom:10px;">🔗 Invite family to this room</button>
+    <button class="btn secondary more-item" id="leave-btn" style="text-align:left;">↩ Switch room</button>
   </div>
 
   <div class="panel" id="panel-week">
+    <button class="back-more" data-goto="more">‹ More</button>
     <h2 class="section-title">This week</h2>
     <p class="hint">What got made each day in the last 7 days, with rough nutrition. Approximate — for awareness, not tracking.</p>
     <div class="week-box" id="week-summary"></div>
@@ -697,10 +698,6 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
     createAndEnter({ householdName: document.getElementById('setup-household').value.trim(), dietPref: setupDiet, cuisines: setupCuisines, people: setupMembers });
   });
   document.getElementById('setup-skip').addEventListener('click', ()=>createAndEnter({}));
-  const rbMenu = document.getElementById('rb-menu'), rbBtn = document.getElementById('rb-menu-btn');
-  rbBtn.addEventListener('click', e=>{ e.stopPropagation(); rbMenu.classList.toggle('show'); });
-  document.addEventListener('click', e=>{ if(!rbMenu.contains(e.target) && e.target!==rbBtn) rbMenu.classList.remove('show'); });
-  rbMenu.querySelectorAll('.rb-menu-item').forEach(b=>b.addEventListener('click', ()=>rbMenu.classList.remove('show')));
   document.getElementById('copy-code-btn').addEventListener('click', ()=>{
     if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(roomCode).then(()=>toast('Room code copied ✓')).catch(()=>toast('Room code: '+roomCode));
     else toast('Room code: '+roomCode);
