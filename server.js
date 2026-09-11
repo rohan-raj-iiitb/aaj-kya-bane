@@ -141,7 +141,9 @@ function createRoom(db, opts = {}) {
       lastMade: null,
     })),
     plan: [], // saved meal requests: { id, date, meal, dishId, dishName, createdAt }
-    bought: [], // shopping items already ticked off (ingredient names, shared)
+    bought: [],        // shopping items currently ticked off (shared)
+    boughtLog: [],     // dated purchase history: { item, at } (last ~30 days)
+    shoppingExtra: [], // manually-added shopping items (not from a planned dish)
   };
   saveDB(db);
   return db.rooms[code];
@@ -466,22 +468,49 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
-      // ---- bought (shopping ticks, shared across the household) ----
+      // ---- bought (shopping ticks + dated history, shared) ----
       if (parts[3] === 'bought') {
         if (!Array.isArray(room.bought)) room.bought = [];
+        if (!Array.isArray(room.boughtLog)) room.boughtLog = [];
         if (req.method === 'POST' && parts.length === 4) {
           const body = await readBody(req);
           const item = clampStr(body.item, 60).trim().toLowerCase();
           if (!item) return sendJSON(res, 400, { error: 'item required' });
-          if (body.on) { if (!room.bought.includes(item)) room.bought.push(item); }
-          else { room.bought = room.bought.filter(i => i !== item); }
+          const today = new Date().toISOString().slice(0, 10);
+          if (body.on) {
+            if (!room.bought.includes(item)) room.bought.push(item);
+            if (!room.boughtLog.some(e => e.item === item && e.at === today)) room.boughtLog.push({ item, at: today });
+          } else {
+            room.bought = room.bought.filter(i => i !== item);
+            room.boughtLog = room.boughtLog.filter(e => !(e.item === item && e.at === today)); // undo today's
+          }
+          const cutoff = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+          room.boughtLog = room.boughtLog.filter(e => e.at >= cutoff); // keep ~30 days
           saveDB(db);
-          return sendJSON(res, 200, { ok: true, bought: room.bought });
+          return sendJSON(res, 200, { ok: true, bought: room.bought, boughtLog: room.boughtLog });
         }
         if (req.method === 'DELETE' && parts.length === 4) {
-          room.bought = [];
+          room.bought = []; // clear the checklist; history (boughtLog) is kept
           saveDB(db);
           return sendJSON(res, 200, { ok: true, bought: [] });
+        }
+      }
+
+      // ---- shopping-extra (manually added items, shared) ----
+      if (parts[3] === 'shopping-extra') {
+        if (!Array.isArray(room.shoppingExtra)) room.shoppingExtra = [];
+        if (req.method === 'POST' && parts.length === 4) {
+          const body = await readBody(req);
+          const item = clampStr(body.item, 60).trim().toLowerCase();
+          if (!item) return sendJSON(res, 400, { error: 'item required' });
+          if (body.on === false) {
+            room.shoppingExtra = room.shoppingExtra.filter(i => i !== item);
+            room.bought = (room.bought || []).filter(i => i !== item);
+          } else if (room.shoppingExtra.length < LIMITS.ingredients * 2) {
+            if (!room.shoppingExtra.includes(item)) room.shoppingExtra.push(item);
+          }
+          saveDB(db);
+          return sendJSON(res, 200, { ok: true, shoppingExtra: room.shoppingExtra, bought: room.bought });
         }
       }
     }

@@ -242,6 +242,9 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
 .shop-item input{width:18px;height:18px;flex:none;}
 .shop-item.checked label{text-decoration:line-through;color:var(--ink-soft);}
 .shop-item .count{margin-left:auto;font-size:11.5px;color:var(--ink-soft);}
+.shop-item .shop-x{margin-left:auto;color:var(--red);font-size:17px;line-height:1;}
+.recent-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--card-line);font-size:13.5px;}
+.recent-row:last-child{border-bottom:none;}
 /* this-week per-day breakdown */
 .week-day{margin-bottom:16px;}
 .week-day:last-child{margin-bottom:0;}
@@ -466,10 +469,17 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
 
   <div class="panel" id="panel-shopping">
     <h2 class="section-title">🛒 Shopping list</h2>
-    <p class="hint">Everything you need for the meals planned in the next 7 days. Tick items as you buy — this checklist stays on your phone.</p>
-    <button class="btn secondary" id="copy-shopping-btn" style="width:auto;margin-bottom:14px;">Copy list</button>
-    <button class="btn secondary" id="clear-ticks-btn" style="width:auto;margin:0 0 14px 8px;">Clear ticks</button>
+    <p class="hint">From your planned meals (next 7 days) plus anything you add. Tick items as you buy — shared with the household.</p>
+    <div class="tag-input-row"><input type="text" id="shop-add-input" placeholder="Add an item — e.g. milk, oil" /><button class="btn" id="shop-add-btn" style="width:auto;">Add</button></div>
     <div id="shopping-list"></div>
+    <div style="margin-top:12px;">
+      <button class="btn secondary" id="copy-shopping-btn" style="width:auto;">Copy list</button>
+      <button class="btn secondary" id="clear-ticks-btn" style="width:auto;margin-left:8px;">Clear ticks</button>
+    </div>
+    <div class="section-divider"></div>
+    <h2 class="section-title">Bought in the last 7 days</h2>
+    <p class="hint">So you don’t re-buy what you just got.</p>
+    <div id="recent-bought"></div>
   </div>
 
   <div class="panel" id="panel-more">
@@ -1184,9 +1194,15 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
     });
     return counts;
   }
+  function allShoppingItems(){
+    const counts = shoppingAgg();
+    const extras = new Set(room.shoppingExtra||[]);
+    const names = new Set([...Object.keys(counts), ...extras]);
+    return [...names].sort().map(name=>({ name, count: counts[name]||0, extra: extras.has(name) }));
+  }
   function remainingToBuy(){
     const bought = new Set(room.bought||[]);
-    return Object.keys(shoppingAgg()).filter(i=>!bought.has(i)).length;
+    return allShoppingItems().filter(x=>!bought.has(x.name)).length;
   }
   function renderShopHook(){
     const el = document.getElementById('shop-hook');
@@ -1197,22 +1213,57 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
   }
   function renderShoppingList(){
     const el = document.getElementById('shopping-list');
-    const counts = shoppingAgg();
-    const items = Object.keys(counts).sort();
-    if(items.length===0){ el.innerHTML = '<div class="empty">Plan some meals and their ingredients will appear here.</div>'; return; }
+    const items = allShoppingItems();
     const bought = new Set(room.bought||[]);
-    el.innerHTML = items.map((ing,i)=>`<div class="shop-item ${bought.has(ing)?'checked':''}">
-      <input type="checkbox" id="shop-${i}" data-shop="${escapeHtml(ing)}" ${bought.has(ing)?'checked':''}>
-      <label for="shop-${i}">${escapeHtml(ing)}</label>
-      <span class="count">${counts[ing]} dish${counts[ing]>1?'es':''}</span>
-    </div>`).join('');
+    if(items.length===0){ el.innerHTML = '<div class="empty">Plan meals or add an item above — they’ll show here.</div>'; renderRecentBought(); return; }
+    el.innerHTML = items.map((x,i)=>{
+      const checked = bought.has(x.name);
+      const right = x.extra ? `<button class="icon-btn shop-x" data-shop-remove="${escapeHtml(x.name)}">×</button>`
+                            : `<span class="count">${x.count} dish${x.count>1?'es':''}</span>`;
+      return `<div class="shop-item ${checked?'checked':''}">
+        <input type="checkbox" id="shop-${i}" data-shop="${escapeHtml(x.name)}" ${checked?'checked':''}>
+        <label for="shop-${i}">${escapeHtml(x.name)}</label>
+        ${right}
+      </div>`;
+    }).join('');
     el.querySelectorAll('[data-shop]').forEach(cb=>cb.addEventListener('change', async ()=>{
       cb.closest('.shop-item').classList.toggle('checked', cb.checked);
       const r = await api(`/room/${roomCode}/bought`, 'POST', {item: cb.dataset.shop, on: cb.checked});
-      room.bought = r.bought;
-      renderShopHook();
+      room.bought = r.bought; room.boughtLog = r.boughtLog;
+      renderShopHook(); renderRecentBought();
     }));
+    el.querySelectorAll('[data-shop-remove]').forEach(b=>b.addEventListener('click', async ()=>{
+      const r = await api(`/room/${roomCode}/shopping-extra`, 'POST', {item: b.dataset.shopRemove, on:false});
+      room.shoppingExtra = r.shoppingExtra; room.bought = r.bought;
+      renderShoppingList(); renderShopHook();
+    }));
+    renderRecentBought();
   }
+  function renderRecentBought(){
+    const el = document.getElementById('recent-bought');
+    if(!el) return;
+    const min = isoForOffset(-7), map = {};
+    (room.boughtLog||[]).forEach(e=>{ if(e.at>=min){ if(!map[e.item] || e.at>map[e.item]) map[e.item]=e.at; } });
+    const rows = Object.entries(map).sort((a,b)=> a[1]<b[1]?1:-1);
+    if(!rows.length){ el.innerHTML = '<span class="hint">Nothing ticked off in the last 7 days yet.</span>'; return; }
+    el.innerHTML = rows.map(([item,at])=>{
+      const n = daysSince(at);
+      const when = n<=0?'today':n===1?'yesterday':n+'d ago';
+      return `<div class="recent-row"><span>${escapeHtml(item)}</span><span class="hint">${when}</span></div>`;
+    }).join('');
+  }
+  function addShopItem(){
+    const inp = document.getElementById('shop-add-input');
+    const v = inp.value.trim();
+    if(!v) return;
+    inp.value=''; inp.focus();
+    api(`/room/${roomCode}/shopping-extra`, 'POST', {item:v, on:true}).then(r=>{
+      room.shoppingExtra = r.shoppingExtra;
+      renderShoppingList(); renderShopHook();
+    });
+  }
+  document.getElementById('shop-add-btn').addEventListener('click', addShopItem);
+  document.getElementById('shop-add-input').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); addShopItem(); } });
   function autoSelectPeopleForMeal(){
     if(!room) return;
     selectedTodayPeople = room.people.filter(p=>personMeals(p)[selectedMeal]).map(p=>p.id);
