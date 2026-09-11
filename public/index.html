@@ -367,7 +367,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
     <input type="text" id="dish-search" placeholder="🔍 Search any dish to propose…" style="margin-bottom:12px;" />
     <div id="search-results"></div>
     <div id="suggestions-normal">
-      <button class="btn" id="decide-btn" style="margin-bottom:14px;">🎲 Decide for me</button>
+      <button class="btn" id="decide-btn" data-noguard style="margin-bottom:14px;">🎲 Decide for me</button>
       <div id="decide-result"></div>
       <div id="fresh-matches"></div>
       <div class="filter-row" id="picks-diet-filter"></div>
@@ -639,7 +639,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
   const _btnClick = new WeakMap();
   document.addEventListener('click', e=>{
     const btn = e.target.closest('.btn');
-    if(!btn) return;
+    if(!btn || btn.hasAttribute('data-noguard')) return;
     const t = Date.now(), last = _btnClick.get(btn) || 0;
     if(t - last < 700){ e.stopImmediatePropagation(); e.preventDefault(); }
     else _btnClick.set(btn, t);
@@ -939,8 +939,9 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
   document.addEventListener('click', e=>{ const b=e.target.closest('[data-goto]'); if(b){ e.preventDefault(); gotoPanel(b.dataset.goto); } });
   document.getElementById('shop-hook').addEventListener('click', ()=>document.querySelector('.navbtn[data-tab="shopping"]').click());
   document.getElementById('copy-shopping-btn').addEventListener('click', ()=>{
-    const items = Object.keys(shoppingAgg()).sort();
-    if(!items.length){ toast('Nothing to buy yet'); return; }
+    const bought = new Set(room.bought||[]);
+    const items = allShoppingItems().filter(x=>!bought.has(x.name)).map(x=>x.name);
+    if(!items.length){ toast('Nothing left to buy'); return; }
     const text = 'Shopping list 🛒\n' + items.map(i=>'• '+i).join('\n');
     if(navigator.share){ navigator.share({title:'Shopping list', text}).catch(()=>{}); return; }
     if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(()=>toast('List copied ✓')).catch(()=>toast('Copied'));
@@ -1535,9 +1536,17 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
     bindPickActions(el);
   }
   function decideForMe(){
-    const ranked = rankedPool(3);
-    if(ranked.length===0){ toast('Add or tag some dishes for '+selectedMeal+' first'); decidedId=null; renderDecideResult(); return; }
-    decidedId = ranked[Math.floor(Math.random()*ranked.length)].d.id;
+    const pool = rankedPool();   // every suitable dish for this meal/diet, scored
+    if(pool.length===0){ toast('Add or tag some dishes for '+selectedMeal+' first'); decidedId=null; renderDecideResult(); return; }
+    // don't repeat the last pick when there's a choice
+    let choices = (pool.length>1 && decidedId) ? pool.filter(x=>x.d.id!==decidedId) : pool;
+    // weighted random: better-scoring dishes are likelier, but the whole list is in play
+    const minScore = Math.min(...choices.map(x=>x.score));
+    const weights = choices.map(x=> Math.max(0.4, (x.score - minScore) + 1));
+    const total = weights.reduce((a,b)=>a+b, 0);
+    let r = Math.random()*total, idx=0;
+    for(; idx<weights.length-1; idx++){ r -= weights[idx]; if(r<=0) break; }
+    decidedId = choices[idx].d.id;
     renderDecideResult();
     document.getElementById('decide-result').scrollIntoView({behavior:'smooth', block:'center'});
   }
