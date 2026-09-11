@@ -1,5 +1,5 @@
 // Aaj Kya Bane service worker — offline shell, network-first so deploys update.
-const CACHE = 'akb-v1';
+const CACHE = 'akb-v2';
 const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -21,14 +21,14 @@ self.addEventListener('fetch', e => {
   if (url.origin !== self.location.origin) return;      // only our own assets
   if (url.pathname.startsWith('/api')) return;          // API always hits the network
 
-  // network-first: fresh when online (so deploys ship), cached fallback offline
+  // stale-while-revalidate: show the cached shell instantly (fast even on a cold
+  // start), and refresh the cache in the background for next time.
   e.respondWith(
-    fetch(req)
-      .then(res => {
-        const copy = res.clone();
-        caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
-        return res;
-      })
-      .catch(() => caches.match(req).then(r => r || caches.match('/index.html')))
+    caches.match(req).then(cached => {
+      const network = fetch(req)
+        .then(res => { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {}); return res; })
+        .catch(() => cached || caches.match('/index.html'));
+      return cached || network;
+    })
   );
 });

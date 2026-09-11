@@ -196,6 +196,12 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 #loadbar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--gold);z-index:60;opacity:0;transition:width .2s ease,opacity .3s ease;}
 #loadbar.on{opacity:1;}
+#loading-splash{position:fixed;inset:0;background:var(--bg);display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:80;}
+#loading-splash.show{display:flex;}
+.ls-logo{font-size:52px;animation:lspulse 1.3s ease-in-out infinite;}
+.ls-text{font-size:14px;color:var(--ink-soft);}
+@keyframes lspulse{0%,100%{opacity:.55;transform:scale(.96)}50%{opacity:1;transform:scale(1.04)}}
+@media (prefers-reduced-motion: reduce){.ls-logo{animation:none;}}
 #confirm-backdrop{position:fixed;inset:0;background:rgba(43,29,20,.45);display:none;align-items:center;justify-content:center;z-index:70;padding:20px;}
 #confirm-backdrop.show{display:flex;}
 #confirm-box{background:var(--bg);border:1px solid var(--card-line);border-radius:12px;padding:22px;max-width:360px;width:100%;box-shadow:0 12px 44px rgba(0,0,0,.28);}
@@ -258,6 +264,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
 <body>
 <div id="loadbar"></div>
 <div id="toast"></div>
+<div id="loading-splash"><div class="ls-logo">🍲</div><div class="ls-text">Loading your kitchen…</div></div>
 <div id="ios-install-hint"></div>
 <div id="welcome-backdrop">
   <div id="welcome-box">
@@ -419,6 +426,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
     </div>
     </div>
     <h2 class="section-title">Your dish list</h2>
+    <input type="text" id="dish-list-search" placeholder="🔍 Search your dishes" style="margin-bottom:10px;" />
     <div class="filter-row" id="dish-category-filter"></div>
     <div class="filter-row" id="dish-diet-filter"></div>
     <div id="dish-list"></div>
@@ -527,6 +535,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
   let editingDishId = null;   // set when the form is editing an existing dish
   let dishCategoryFilter = 'all';
   let dishDietFilter = 'all';
+  let dishListQuery = '';
 
   function escapeHtml(str){ return String(str).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
   function daysSince(dateStr){ if(!dateStr) return 999; const d1=new Date(dateStr), d2=new Date(new Date().toISOString().slice(0,10)); return Math.round((d2-d1)/86400000); }
@@ -626,6 +635,15 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
       return data;
     } finally { loadEnd(); }
   }
+  // guard: swallow an accidental second tap on an action button within 700ms
+  const _btnClick = new WeakMap();
+  document.addEventListener('click', e=>{
+    const btn = e.target.closest('.btn');
+    if(!btn) return;
+    const t = Date.now(), last = _btnClick.get(btn) || 0;
+    if(t - last < 700){ e.stopImmediatePropagation(); e.preventDefault(); }
+    else _btnClick.set(btn, t);
+  }, true);
   // surface any failed action instead of failing silently
   window.addEventListener('unhandledrejection', e=>{
     const m = (e.reason && e.reason.message) || '';
@@ -1262,6 +1280,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
       renderShoppingList(); renderShopHook();
     });
   }
+  document.getElementById('dish-list-search').addEventListener('input', e=>{ dishListQuery = e.target.value.trim().toLowerCase(); renderDishList(); });
   document.getElementById('shop-add-btn').addEventListener('click', addShopItem);
   document.getElementById('shop-add-input').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); addShopItem(); } });
   function autoSelectPeopleForMeal(){
@@ -1716,6 +1735,10 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
   document.getElementById('save-dish-btn').addEventListener('click', async ()=>{
     const name = document.getElementById('dish-name').value.trim();
     if(!name){ toast('Give the dish a name'); return; }
+    if(!editingDishId){
+      const dup = room.dishes.find(d=>d.name.trim().toLowerCase()===name.toLowerCase());
+      if(dup && !await confirmDialog(`You already have “${dup.name}”. Add another?`, 'Add anyway')) return;
+    }
     const category = document.getElementById('dish-category').value;
     const diet = document.getElementById('dish-diet').value;
     const cookRating = document.getElementById('dish-cook-rating').value;
@@ -1765,7 +1788,8 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
     else if(dishCategoryFilter==='breakfast') filtered = room.dishes.filter(d=>d.category==='breakfast' || dishMealTimes(d).includes('breakfast')); // category OR breakfast-tagged
     else filtered = room.dishes.filter(d=>d.category===dishCategoryFilter);
     if(dishDietFilter!=='all') filtered = filtered.filter(d=>dishDiet(d)===dishDietFilter);
-    if(filtered.length===0){ el.innerHTML = '<div class="empty">No dishes here yet.</div>'; return; }
+    if(dishListQuery) filtered = filtered.filter(d=>d.name.toLowerCase().includes(dishListQuery));
+    if(filtered.length===0){ el.innerHTML = `<div class="empty">No ${dishListQuery?'matching ':''}dishes${dishListQuery?'':' here yet'}.</div>`; return; }
     const ratingLabel = {great:'Great', okay:'Okay', unknown:"Doesn't know", avoid:'Avoid'};
     el.innerHTML = filtered.map(d=>{
       const likedNames = d.likedBy.map(id=> room.people.find(p=>p.id===id)?.name).filter(Boolean);
@@ -1911,11 +1935,17 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
   if(MEALS.includes(_params.get('meal'))) selectedMeal = _params.get('meal');
   if(_params.get('day')==='today' || _params.get('day')==='tomorrow') selectedDay = _params.get('day');
   // invite link (?room=CODE) auto-joins that room; else auto-rejoin the saved one
+  const splash = document.getElementById('loading-splash');
   const _invited = (_params.get('room') || '').trim().toUpperCase();
-  if(_invited){
-    tryEnterRoom(_invited).then(ok=>{ if(!ok && roomCode) tryEnterRoom(roomCode); });
-    history.replaceState(null, '', location.pathname);
-  } else if(roomCode){ tryEnterRoom(roomCode); }
+  const _target = _invited || roomCode;
+  if(_target){
+    splash.classList.add('show');
+    tryEnterRoom(_target)
+      .then(ok => (!ok && _invited && roomCode && roomCode !== _target) ? tryEnterRoom(roomCode) : ok)
+      .catch(()=>{})
+      .finally(()=> splash.classList.remove('show'));
+    if(_invited) history.replaceState(null, '', location.pathname);
+  }
 })();
 </script>
 </body>
