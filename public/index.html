@@ -45,6 +45,7 @@ body{
 .more-room{font-size:13.5px;color:var(--ink-soft);margin-bottom:12px;}
 .more-room b{letter-spacing:1px;color:var(--ink);}
 .back-more{background:none;border:none;color:var(--gold);font-size:13.5px;font-weight:600;cursor:pointer;padding:0 0 12px;font-family:'Inter',sans-serif;}
+.week-link{color:var(--gold);font-weight:600;text-decoration:none;}
 
 /* bottom tab bar */
 #bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:40;display:flex;background:var(--card);border-top:1px solid var(--card-line);padding-bottom:env(safe-area-inset-bottom);}
@@ -467,6 +468,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
     <h2 class="section-title">🛒 Shopping list</h2>
     <p class="hint">Everything you need for the meals planned in the next 7 days. Tick items as you buy — this checklist stays on your phone.</p>
     <button class="btn secondary" id="copy-shopping-btn" style="width:auto;margin-bottom:14px;">Copy list</button>
+    <button class="btn secondary" id="clear-ticks-btn" style="width:auto;margin:0 0 14px 8px;">Clear ticks</button>
     <div id="shopping-list"></div>
   </div>
 
@@ -892,26 +894,21 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
     if(dish) proposeDish(dish);   // proposeDish clears the search + re-renders
   }
 
-  document.querySelectorAll('.navbtn').forEach(tab=>{
-    tab.addEventListener('click', ()=>{
-      document.querySelectorAll('.navbtn').forEach(t=>t.classList.remove('active'));
-      document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
-      tab.classList.add('active');
-      document.getElementById('panel-'+tab.dataset.tab).classList.add('active');
-      window.scrollTo(0, 0);
-      if(tab.dataset.tab === 'week') renderWeek();
-      if(tab.dataset.tab === 'plan') renderWeekPlan();
-      if(tab.dataset.tab === 'shopping') renderShoppingList();
-    });
-  });
-  // "More" menu → open People or This week
-  document.querySelectorAll('[data-goto]').forEach(b=>b.addEventListener('click', ()=>{
-    const t = b.dataset.goto;
+  function gotoPanel(t){
+    const panel = document.getElementById('panel-'+t);
+    if(!panel) return;
     document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
-    document.getElementById('panel-'+t).classList.add('active');
-    window.scrollTo(0,0);
+    panel.classList.add('active');
+    document.querySelectorAll('.navbtn').forEach(n=>n.classList.remove('active'));
+    (document.querySelector('.navbtn[data-tab="'+t+'"]') || document.querySelector('.navbtn[data-tab="more"]')).classList.add('active');
+    window.scrollTo(0, 0);
     if(t==='week') renderWeek();
-  }));
+    if(t==='plan') renderWeekPlan();
+    if(t==='shopping') renderShoppingList();
+  }
+  document.querySelectorAll('.navbtn').forEach(tab=>tab.addEventListener('click', ()=>gotoPanel(tab.dataset.tab)));
+  // delegated so dynamically-created links (e.g. "This week" on a made meal) work too
+  document.addEventListener('click', e=>{ const b=e.target.closest('[data-goto]'); if(b){ e.preventDefault(); gotoPanel(b.dataset.goto); } });
   document.getElementById('shop-hook').addEventListener('click', ()=>document.querySelector('.navbtn[data-tab="shopping"]').click());
   document.getElementById('copy-shopping-btn').addEventListener('click', ()=>{
     const items = Object.keys(shoppingAgg()).sort();
@@ -920,6 +917,12 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
     if(navigator.share){ navigator.share({title:'Shopping list', text}).catch(()=>{}); return; }
     if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(()=>toast('List copied ✓')).catch(()=>toast('Copied'));
     else toast('Copied');
+  });
+  document.getElementById('clear-ticks-btn').addEventListener('click', async ()=>{
+    const r = await api(`/room/${roomCode}/bought`, 'DELETE');
+    room.bought = r.bought;
+    renderShoppingList(); renderShopHook();
+    toast('Ticks cleared');
   });
 
   // ---------- NOW BAR + MEAL PLANNER ----------
@@ -1036,7 +1039,7 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
       let statusChip, meta, actions;
       if(status==='made'){
         statusChip = '<span class="badge great">Made ✓</span>';
-        meta = 'Cooked — added to “This week”';
+        meta = 'Cooked · <a href="#" class="week-link" data-goto="week">see in This week ›</a>';
         actions = `<button class="btn small secondary" data-undo-made="${p.id}">Undo</button>`;
       } else if(status==='agreed'){
         statusChip = '<span class="badge great">Agreed</span>';
@@ -1181,9 +1184,13 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
     });
     return counts;
   }
+  function remainingToBuy(){
+    const bought = new Set(room.bought||[]);
+    return Object.keys(shoppingAgg()).filter(i=>!bought.has(i)).length;
+  }
   function renderShopHook(){
     const el = document.getElementById('shop-hook');
-    const n = Object.keys(shoppingAgg()).length;
+    const n = remainingToBuy();
     if(!n){ el.style.display='none'; return; }
     el.style.display='flex';
     el.innerHTML = `<span>🛒 ${n} thing${n>1?'s':''} to buy this week</span><span>›</span>`;
@@ -1192,14 +1199,18 @@ input[type=text],select{font-family:'Inter',sans-serif;font-size:16px;padding:9p
     const el = document.getElementById('shopping-list');
     const counts = shoppingAgg();
     const items = Object.keys(counts).sort();
-    if(items.length===0){ el.innerHTML = '<div class="empty">Plan some meals above and their ingredients will appear here.</div>'; return; }
-    el.innerHTML = items.map((ing,i)=>`<div class="shop-item">
-      <input type="checkbox" id="shop-${i}" data-shop>
+    if(items.length===0){ el.innerHTML = '<div class="empty">Plan some meals and their ingredients will appear here.</div>'; return; }
+    const bought = new Set(room.bought||[]);
+    el.innerHTML = items.map((ing,i)=>`<div class="shop-item ${bought.has(ing)?'checked':''}">
+      <input type="checkbox" id="shop-${i}" data-shop="${escapeHtml(ing)}" ${bought.has(ing)?'checked':''}>
       <label for="shop-${i}">${escapeHtml(ing)}</label>
       <span class="count">${counts[ing]} dish${counts[ing]>1?'es':''}</span>
     </div>`).join('');
-    el.querySelectorAll('[data-shop]').forEach(cb=>cb.addEventListener('change', ()=>{
+    el.querySelectorAll('[data-shop]').forEach(cb=>cb.addEventListener('change', async ()=>{
       cb.closest('.shop-item').classList.toggle('checked', cb.checked);
+      const r = await api(`/room/${roomCode}/bought`, 'POST', {item: cb.dataset.shop, on: cb.checked});
+      room.bought = r.bought;
+      renderShopHook();
     }));
   }
   function autoSelectPeopleForMeal(){

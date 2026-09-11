@@ -141,6 +141,7 @@ function createRoom(db, opts = {}) {
       lastMade: null,
     })),
     plan: [], // saved meal requests: { id, date, meal, dishId, dishName, createdAt }
+    bought: [], // shopping items already ticked off (ingredient names, shared)
   };
   saveDB(db);
   return db.rooms[code];
@@ -462,6 +463,25 @@ const server = http.createServer(async (req, res) => {
           room.plan = room.plan.filter(p => p.id !== parts[4]);
           saveDB(db);
           return sendJSON(res, 200, { ok: true });
+        }
+      }
+
+      // ---- bought (shopping ticks, shared across the household) ----
+      if (parts[3] === 'bought') {
+        if (!Array.isArray(room.bought)) room.bought = [];
+        if (req.method === 'POST' && parts.length === 4) {
+          const body = await readBody(req);
+          const item = clampStr(body.item, 60).trim().toLowerCase();
+          if (!item) return sendJSON(res, 400, { error: 'item required' });
+          if (body.on) { if (!room.bought.includes(item)) room.bought.push(item); }
+          else { room.bought = room.bought.filter(i => i !== item); }
+          saveDB(db);
+          return sendJSON(res, 200, { ok: true, bought: room.bought });
+        }
+        if (req.method === 'DELETE' && parts.length === 4) {
+          room.bought = [];
+          saveDB(db);
+          return sendJSON(res, 200, { ok: true, bought: [] });
         }
       }
     }
